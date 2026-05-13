@@ -433,9 +433,10 @@ function connectWebSocket(wsUrl){
     ws.onmessage = function(e){
         var s = JSON.parse(e.data);
         if (s.error || s.pong) return;
+        var warning = !!s.is_warning_distraction;
         var significant = !!s.is_significant_distraction;
-        updateBar(s.is_attentive ? 'attentive' : (significant ? 'distracted' : ''),
-                  s.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت ملحوظ ⚠️' : 'وقت قصير للعودة للتركيز'),
+        updateBar(s.is_attentive ? 'attentive' : ((warning || significant) ? 'distracted' : ''),
+                  s.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت محسوب ⚠️' : (warning ? 'انتبه للدرس' : 'وقت قصير للعودة للتركيز')),
                   s.attention_score);
         if (s.alert_message) showAlert(s.alert_message);
     };

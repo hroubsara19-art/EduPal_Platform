@@ -421,10 +421,11 @@ function connectWebSocket(wsUrl){
   ws.onmessage=function(e){
     var state=JSON.parse(e.data);
     if(state.error) return;
+    var warning = !!state.is_warning_distraction;
     var significant = !!state.is_significant_distraction;
     updateBar(
-      state.is_attentive ? 'attentive' : (significant ? 'distracted' : ''),
-      state.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت ملحوظ ⚠️' : 'وقت قصير للعودة للتركيز'),
+      state.is_attentive ? 'attentive' : ((warning || significant) ? 'distracted' : ''),
+      state.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت محسوب ⚠️' : (warning ? 'انتبه للدرس' : 'وقت قصير للعودة للتركيز')),
       state.attention_score
     );
     if(state.alert_message) showAlert(state.alert_message);
