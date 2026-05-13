@@ -370,7 +370,7 @@ window.addEventListener('load', function(){ requestCameraAndStart(); });
 
 function requestCameraAndStart(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    updateBar('','ط§ظ„ظ…طھطµظپط­ ظ„ط§ ظٹط¯ط¹ظ… ط§ظ„ظƒط§ظ…ظٹط±ط§',0);
+    updateBar('', 'المتصفح لا يدعم الكاميرا', 0);
     startTrackingWithoutCamera(); return;
   }
   navigator.mediaDevices.getUserMedia({video:true})
@@ -380,10 +380,10 @@ function requestCameraAndStart(){
     })
     .catch(function(err){
       if(err.name==='NotAllowedError'||err.name==='PermissionDeniedError'){
-        updateBar('','طھظ… ط±ظپط¶ ط§ظ„ظƒط§ظ…ظٹط±ط§ â€” ط§ظ„طھطھط¨ط¹ ظ…ط¹ط·ظ‘ظ„',0);
-        showAlert('âڑ ï¸ڈ ظٹظ…ظƒظ†ظƒ ظ…طھط§ط¨ط¹ط© ط§ظ„ط¯ط±ط³ ط¨ط¯ظˆظ† طھطھط¨ط¹ ط§ظ„ط§ظ†طھط¨ط§ظ‡.');
+        updateBar('', 'تم رفض الكاميرا — التتبع معطّل', 0);
+        showAlert('⚠️ يمكنك متابعة الدرس بدون تتبع الانتباه.');
       } else {
-        updateBar('','ظ…ط´ظƒظ„ط© ظپظٹ ط§ظ„ظƒط§ظ…ظٹط±ط§',0);
+        updateBar('', 'مشكلة في الكاميرا', 0);
       }
       startTrackingWithoutCamera();
     });
@@ -406,7 +406,7 @@ function startTracking(){
     if(data.ok){
       trackingActive=true;
       connectWebSocket(data.ws_url);
-      updateBar('attentive','ط§ظ„طھطھط¨ط¹ ظ†ط´ط· âœ…',100);
+      updateBar('attentive', 'التتبع نشط ✅', 100);
     } else {
       startTrackingWithoutCamera();
     }
@@ -460,7 +460,7 @@ function stopTracking(){
   trackingActive=false;
   if(ws) ws.close();
   var btn=document.getElementById('stop-btn');
-  if(btn){ btn.innerHTML='<i class="fas fa-check"></i> طھظ… ط§ظ„ط¥ظٹظ‚ط§ظپ'; }
+  if(btn){ btn.innerHTML='<i class="fas fa-check"></i> تم الإيقاف'; }
   
   fetch("{% url 'student:attention_stop' %}",{
     method:'POST',
