@@ -5,7 +5,7 @@ attention_engine.py — نسخة محسّنة
   - منطق FocusBuddy: MediaPipe Pose لنسبة الأنف/الأذن الأفقية (0.65–1.35)
   - EAR فوري < 0.20 من Face Mesh (كالنموذج المرجعي)
   - Face Mesh احتياطي: نسبة أنف/أذن + نظر + نعاس متتابع
-  - توقيت تحذير 3 ث ثم تشتت ملحوظ 5 ث مع تبريد التنبيهات
+  - توقيت تحذير ~2 ث ثم تشتت ملحوظ ~4 ث (مناسب لإطارات الويب المنخفضة)
 ═══════════════════════════════════════════════════════════════
 """
 
@@ -27,28 +27,34 @@ from PIL import Image
 # ══════════════════════════════════════════════════════════════
 
 # نسبة الأنف/الأذن — Face Mesh (احتياطي إذا لم يظهر الجسم في الإطار)
-NOSE_EAR_RATIO_MIN  = 0.65   # أقل = التفات يمين
-NOSE_EAR_RATIO_MAX  = 1.35   # متماثل مع FocusBuddy (كان 1.40)
+NOSE_EAR_RATIO_MIN  = 0.62   # أقل = التفات يمين (أوسع للويب)
+NOSE_EAR_RATIO_MAX  = 1.38
 
-# FocusBuddy: Pose أفقي |nose.x−ear.x| (نفس النموذج Tk)
-POSE_HEAD_RATIO_MIN = 0.65
-POSE_HEAD_RATIO_MAX = 1.35
+# FocusBuddy: Pose أفقي (نطاق أوسع قليلاً للويب/كاميرا أمامية)
+POSE_HEAD_RATIO_MIN = 0.62
+POSE_HEAD_RATIO_MAX = 1.38
 
-# EAR — نسبة انفتاح العين
+# EAR — نسبة انفتاح العين (ويب: JPEG منخفض + ~3 إطارات/ث → تنعيم مطلوب)
 EAR_THRESHOLD       = 0.22   # للمسار التدريجي (مع عدّ الإطارات)
-FOCUSBUDDY_EAR_THRESHOLD = 0.20  # فوري كالنموذج المرجعي عند كشف التشتت الأساسي
+FOCUSBUDDY_EAR_THRESHOLD = 0.22  # عتبة صارمة سريعة
+EAR_SOFT_THRESHOLD  = 0.30   # مع streak يُفعّل «وضع نعاس» للتنبيهات
+EAR_CLOSED_STREAK   = 3      # إطارات متتالية منخفضة EAR → تفعيل وضع النعاس
+EAR_OPEN_STREAK     = 3      # إطارات مفتوحة لتصفير وضع النعاس
 EAR_CONSEC_FRAMES   = 12     # إطار متتالي تحت الحد → نعاس (مسار دقّة إضافي)
 
 # Gaze — موقع البؤبؤ داخل العين
 GAZE_LEFT_RATIO     = 0.33
 GAZE_RIGHT_RATIO    = 0.67
 
-# FocusBuddy-style timing: warning after 3s, counted distraction after 5s.
+# توقيت التنبيهات (ويب ~3 إطارات/ث → أقصر قليلاً من سطح المكتب حتى تصل الرسائل)
 FOCUS_REQUIRED_SECONDS = 0.8
-DISTRACTION_WARNING_SECONDS = 3.0
-DISTRACTION_THRESHOLD_SECONDS = 5.0
+DISTRACTION_WARNING_SECONDS = 2.0
+DISTRACTION_THRESHOLD_SECONDS = 4.0
 DISTRACTION_SECONDS = DISTRACTION_THRESHOLD_SECONDS
 ALERT_COOLDOWN = DISTRACTION_THRESHOLD_SECONDS
+
+# لا يُصفّر مؤقت التشتت إلا بعد عدة إطارات «منتبه» متتالية (يمنع وميض الإطارات)
+ATTENTIVE_RESET_STREAK = 5
 
 # نقاط Face Mesh
 LEFT_EYE   = [362, 385, 387, 263, 373, 380]
@@ -253,10 +259,24 @@ class AttentionTracker:
 
     def _track_distraction(self, attentive: bool, cause: str,
                            score: int, now: float) -> tuple[Optional[str], float, bool, bool]:
+        """
+        لا يُصفّر مؤقت التشتت عند إطار «منتبه» واحد؛ يحتاج عدة إطارات متتالية
+        حتى لا يُلغى التحذير بسبب وميض النموذج أو ضغط JPEG.
+        """
         if attentive:
-            self._distract_start = None
-            self._warning_nudge_sent = False
-            return None, 0.0, False, False
+            self._attentive_streak += 1
+            if self._attentive_streak >= ATTENTIVE_RESET_STREAK:
+                self._distract_start = None
+                self._warning_nudge_sent = False
+                self._attentive_streak = 0
+                return None, 0.0, False, False
+            # منتبه مؤقتاً لكن المؤلم لا يُصفّر بعد — لا تنبيهات حتى يثبت التركيز
+            if self._distract_start is None:
+                return None, 0.0, False, False
+            distract_dur = now - self._distract_start
+            return None, distract_dur, False, False
+
+        self._attentive_streak = 0
 
         if self._distract_start is None:
             self._distract_start = now
@@ -302,7 +322,24 @@ class AttentionTracker:
             face_ratio = compute_nose_ear_ratio(face_lm, w, h)
             gaze_zone = compute_gaze(face_lm, w, h)
 
-        drowsy_instant = bool(face_lm is not None and ear < FOCUSBUDDY_EAR_THRESHOLD)
+            if ear < EAR_SOFT_THRESHOLD:
+                self._closed_ear_streak = min(self._closed_ear_streak + 1, 30)
+                self._open_ear_streak = 0
+            else:
+                self._open_ear_streak = min(self._open_ear_streak + 1, 30)
+                self._closed_ear_streak = max(0, self._closed_ear_streak - 1)
+
+            if ear < FOCUSBUDDY_EAR_THRESHOLD or self._closed_ear_streak >= EAR_CLOSED_STREAK:
+                self._drowse_active = True
+            if self._open_ear_streak >= EAR_OPEN_STREAK:
+                self._drowse_active = False
+
+            drowsy_instant = self._drowse_active
+        else:
+            self._closed_ear_streak = 0
+            self._open_ear_streak = 0
+            self._drowse_active = False
+            drowsy_instant = False
 
         if pose_distracted:
             display_ratio = ratio_pose if ratio_pose is not None else face_ratio
@@ -339,7 +376,7 @@ class AttentionTracker:
                 self._ear_counter = 0
             drowsy_long = self._ear_counter >= EAR_CONSEC_FRAMES
             score, cause = compute_score(ear, face_ratio, gaze_zone, drowsy_long)
-            attentive = score >= 70
+            attentive = score >= 68
             display_ratio = face_ratio
             drowsy = drowsy_long
 
@@ -398,6 +435,10 @@ class AttentionTracker:
         self._inattention_count = 0
         self._session_start     = None
         self._score_buffer      = []     # لحساب المتوسط
+        self._attentive_streak  = 0      # إطارات منتبه متتالية لتصفير المؤقت
+        self._closed_ear_streak = 0
+        self._open_ear_streak   = 0
+        self._drowse_active     = False
 
     def _init_face_mesh(self):
         """✅ تهيئة face_mesh مرة واحدة فقط."""
