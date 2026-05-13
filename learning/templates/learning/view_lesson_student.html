@@ -366,6 +366,12 @@ var ws             = null;
 var trackingActive = false;
 var alertTimer     = null;
 
+function firstAttentionName(full){
+  if (!full || typeof full !== 'string') return '';
+  var p = full.trim().split(/\s+/);
+  return p[0] || '';
+}
+
 window.addEventListener('load', function(){ requestCameraAndStart(); });
 
 function requestCameraAndStart(){
@@ -423,12 +429,15 @@ function connectWebSocket(wsUrl){
     if(state.error) return;
     var warning = !!state.is_warning_distraction;
     var significant = !!state.is_significant_distraction;
+    var fn = firstAttentionName(state.student_name || '');
+    var neg = significant ? 'تشتت ملحوظ في الجلسة' : (warning ? 'حاول ترجع للتركيز' : 'لحظة بسيطة بعيد عن الدرس');
+    var label = state.is_attentive ? 'منتبه ✅' : (fn ? (fn + '، ' + neg) : neg);
     updateBar(
       state.is_attentive ? 'attentive' : ((warning || significant) ? 'distracted' : ''),
-      state.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت محسوب ⚠️' : (warning ? 'انتبه للدرس' : 'وقت قصير للعودة للتركيز')),
+      label,
       state.attention_score
     );
-    if(state.alert_message) showAlert(state.alert_message);
+    if(state.alert_message) showDistractionToast(state.alert_message, significant);
   };
   ws.onclose=function(){
     if(trackingActive) setTimeout(function(){ if(trackingActive) connectWebSocket(wsUrl); },3000);
@@ -451,9 +460,25 @@ function updateBar(cls,label,score){
 function showAlert(msg){
   var toast=document.getElementById('alert-toast');
   if(!toast) return;
+  toast.style.background='';
   toast.textContent=msg; toast.classList.add('show');
   if(alertTimer) clearTimeout(alertTimer);
   alertTimer=setTimeout(function(){ toast.classList.remove('show'); },5000);
+}
+
+function showDistractionToast(msg, isFirm){
+  var toast=document.getElementById('alert-toast');
+  if(!toast) return;
+  toast.textContent=msg;
+  toast.style.background=isFirm
+    ? 'linear-gradient(135deg,#991b1b,#ef4444)'
+    : 'linear-gradient(135deg,#b45309,#ea580c)';
+  toast.classList.add('show');
+  if(alertTimer) clearTimeout(alertTimer);
+  alertTimer=setTimeout(function(){
+    toast.classList.remove('show');
+    toast.style.background='';
+  },6500);
 }
 
 function stopTracking(){

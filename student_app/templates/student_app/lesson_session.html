@@ -307,6 +307,12 @@ var TIMING_URL = (function(){
 var ws = null, trackingActive = false, alertTimer = null;
 var _mediaStream = null, _frameInterval = null;
 
+function firstAttentionName(full){
+    if (!full || typeof full !== 'string') return '';
+    var p = full.trim().split(/\s+/);
+    return p[0] || '';
+}
+
 window.addEventListener('load', function(){ requestCameraAndStart(); });
 
 function requestCameraAndStart(){
@@ -435,10 +441,13 @@ function connectWebSocket(wsUrl){
         if (s.error || s.pong) return;
         var warning = !!s.is_warning_distraction;
         var significant = !!s.is_significant_distraction;
+        var fn = firstAttentionName(s.student_name || '');
+        var neg = significant ? 'تشتت ملحوظ في الجلسة' : (warning ? 'حاول ترجع للتركيز' : 'لحظة بسيطة بعيد عن الدرس');
+        var label = s.is_attentive ? 'منتبه ✅' : (fn ? (fn + '، ' + neg) : neg);
         updateBar(s.is_attentive ? 'attentive' : ((warning || significant) ? 'distracted' : ''),
-                  s.is_attentive ? 'منتبه ✅' : (significant ? 'تشتت محسوب ⚠️' : (warning ? 'انتبه للدرس' : 'وقت قصير للعودة للتركيز')),
+                  label,
                   s.attention_score);
-        if (s.alert_message) showAlert(s.alert_message);
+        if (s.alert_message) showDistractionToast(s.alert_message, significant);
     };
     ws.onclose = function(){
         stopFrameSending();
@@ -491,9 +500,25 @@ function updateBar(cls, label, score){
 
 function showAlert(msg){
     var t = document.getElementById('alert-toast'); if (!t) return;
-    t.textContent   = msg; t.style.display = 'block';
+    t.textContent = msg;
+    t.style.display = 'block';
     if (alertTimer) clearTimeout(alertTimer);
     alertTimer = setTimeout(function(){ t.style.display = 'none'; }, 5000);
+}
+
+/** رسائل التشتت من الخادم (غالباً تتضمن اسم الطالب) — لون أوضح من تنبيهات الكاميرا */
+function showDistractionToast(msg, isFirm){
+    var t = document.getElementById('alert-toast'); if (!t) return;
+    t.textContent = msg;
+    t.style.background = isFirm
+        ? 'linear-gradient(135deg,#991b1b,#ef4444)'
+        : 'linear-gradient(135deg,#b45309,#ea580c)';
+    t.style.display = 'block';
+    if (alertTimer) clearTimeout(alertTimer);
+    alertTimer = setTimeout(function(){
+        t.style.display = 'none';
+        t.style.background = 'linear-gradient(135deg,var(--sky-dk),var(--sky))';
+    }, 6500);
 }
 
 function setSpeed(s, btn){

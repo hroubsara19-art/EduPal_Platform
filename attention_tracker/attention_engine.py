@@ -173,33 +173,16 @@ def compute_score(ear: float, ratio: float, gaze: str, drowsy: bool) -> tuple[in
     return max(0, min(100, score)), cause
 
 
-def build_alert(name: str, cause: str, score: int) -> Optional[str]:
-    """رسالة تنبيه ودية باسم الطالب — مختلفة في كل مرة."""
-    if score >= 70:
-        return None
-
-    first = name.split()[0] if name else "صديقي"
-
-    alerts = {
-        "drowsy": [
-            f"يا {first}، يبدو أنك تشعر بالنعاس — خذ نفساً عميقاً! 😊",
-            f"هيّا {first}، افتح عينيك عشان ما تفوتك الفائدة! 👀",
-            f"{first}، استيقظ قليلاً — أنت قادر على الإنجاز! ⚡",
-        ],
-        "head_turn": [
-            f"{first}، ثبّت نظرك على الشاشة! 🖥️",
-            f"هيا {first}، الدرس هنا وينتظرك! 🎯",
-            f"يا {first}، لحظة تركيز صغيرة تكفي! 💪",
-        ],
-        "gaze": [
-            f"{first}، الدرس على الشاشة أمامك! 📚",
-            f"يا {first}، أعِد نظرك هنا — اشتقنالك! 😄",
-            f"ركّز معنا {first}، الدرس رائع! 🌟",
-        ],
+def build_warning_nudge(name: str, cause: str) -> str:
+    """تنبيه لطيف باسم الطالب عند أول بلوغ مرحلة التحذير (قبل احتساب التشتت الملحوظ)."""
+    first = name.split()[0] if (name and name.strip()) else "صديقي"
+    lines = {
+        "drowsy": f"{first}، لاحظنا إنك قد تكون متعب — حاول تفتح عينيك وتتابع الدرس.",
+        "head_turn": f"{first}، ثبّت رأسك أمام الشاشة شوي عشان تستفيد من الجلسة.",
+        "gaze": f"{first}، رجّع نظرك لمحتوى الدرس اللي قدامك.",
+        "no_face": f"{first}، ما ظهر وجهك للكاميرا — قدّم شوي أو عدّل الإضاءة.",
     }
-
-    options = alerts.get(cause, [f"{first}، ما زلنا بحاجة لتركيزك! 🎓"])
-    return random.choice(options)
+    return lines.get(cause, f"{first}، ركّز معنا شوي على الدرس.")
 
 
 def build_alert(name: str, cause: str, score: int) -> Optional[str]:
@@ -250,6 +233,7 @@ class AttentionTracker:
                            score: int, now: float) -> tuple[Optional[str], float, bool, bool]:
         if attentive:
             self._distract_start = None
+            self._warning_nudge_sent = False
             return None, 0.0, False, False
 
         if self._distract_start is None:
@@ -266,6 +250,10 @@ class AttentionTracker:
                 self._last_alert = now
                 self._inattention_count += 1
                 self._distract_start = now
+                self._warning_nudge_sent = False
+        elif warning and not significant and not self._warning_nudge_sent:
+            alert = build_warning_nudge(self.student_name, cause)
+            self._warning_nudge_sent = True
 
         return alert, distract_dur, warning, significant
 
@@ -337,6 +325,7 @@ class AttentionTracker:
         self._ear_counter       = 0
         self._distract_start    = None   # وقت بداية التشتت
         self._last_alert        = 0.0
+        self._warning_nudge_sent = False  # تنبيه تحذيري واحد لكل فترة تشتت قبل «الملحوظ»
         self._inattention_count = 0
         self._session_start     = None
         self._score_buffer      = []     # لحساب المتوسط
