@@ -16,7 +16,6 @@
 body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',sans-serif;}
 .session-wrap{max-width:860px;margin:0 auto;padding:1.5rem 1.25rem 5rem;}
 
-/* â”€â”€ ط´ط±ظٹط· ط§ظ„ط§ظ†طھط¨ط§ظ‡ â”€â”€ */
 #attention-bar{
   position:sticky;top:0;z-index:100;
   background:var(--card);border-bottom:2px solid var(--border);
@@ -62,7 +61,6 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   background:linear-gradient(135deg,#f8fafc,#f1f5f9);color:#475569;border-color:#cbd5e1;
 }
 
-/* â”€â”€ ط±ط£ط³ ط§ظ„ط¯ط±ط³ â”€â”€ */
 .lesson-header{
   background:linear-gradient(135deg,var(--sky-dk),var(--sky));
   border-radius:1.25rem;padding:1.75rem 2rem;color:#fff;
@@ -77,7 +75,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 }
 .back-link:hover{color:var(--sky-dk);}
 
-/* â”€â”€ ط§ظ„طµظˆطھ â”€â”€ */
+
 .audio-top-bar{
   background:linear-gradient(120deg,#0f172a,var(--sky-dk));
   border-radius:1rem;padding:1rem 1.25rem;margin-bottom:1.5rem;
@@ -95,7 +93,6 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 }
 .spd-btn:hover,.spd-btn.active{background:rgba(255,255,255,.3);}
 
-/* â”€â”€ ظ…ط­طھظˆظ‰ ط§ظ„ط¯ط±ط³ â”€â”€ */
 .lesson-card{
   background:var(--card);border-radius:1.1rem;
   border:1.5px solid var(--border);
@@ -122,7 +119,6 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 }
 .lesson-section-body{padding:1.5rem;}
 
-/* ط§ظ„ظپظ‚ط±ط§طھ */
 .std-para-block{
   display:flex;gap:1.25rem;align-items:flex-start;
   padding:1.25rem;border-radius:12px;
@@ -151,7 +147,6 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 .std-para-img:hover{transform:scale(1.04);box-shadow:0 6px 20px rgba(0,0,0,.15);}
 @media(max-width:600px){.std-para-block{flex-direction:column;}.std-para-img{width:100%;height:180px;}}
 
-/* â•گâ•گ طھط¸ظ„ظٹظ„ ط§ظ„ظƒظ„ظ…ط§طھ â•گâ•گ */
 .wh-word{
   display:inline;border-radius:3px;padding:0 1px;
   transition:background-color .07s ease,color .07s ease;
@@ -162,7 +157,6 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   box-shadow:0 2px 6px rgba(251,191,36,0.5);font-weight:700;
 }
 
-/* â”€â”€ ظ…ظ„ط®طµ ط§ظ„ط§ظ†طھط¨ط§ظ‡ â”€â”€ */
 #session-summary{
   display:none;background:var(--card);border-radius:1.1rem;
   border:2px solid var(--mint);padding:1.5rem;margin-top:1.5rem;
@@ -185,7 +179,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 {% block content %}
 <div class="session-wrap" dir="rtl">
 
-  <!-- ط´ط±ظٹط· ط§ظ„ط§ظ†طھط¨ط§ظ‡ -->
+  
   <div id="attention-bar">
     <div class="att-dot"></div>
     <span class="att-label" id="att-label">جاري التهيئة…</span>
@@ -274,12 +268,10 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 {{ session_id|json_script:"dj-session-id" }}
 {{ student.daily_chat_limit|default:20|json_script:"dj-chat-limit" }}
 {{ student.chats_today|default:0|json_script:"dj-chat-used" }}
-
-{# âœ… ط¥طµظ„ط§ط­: words_json_url ظٹظڈظ…ط±ظژظ‘ط± ط¨ط´ظƒظ„ طµط±ظٹط­ ط¹ط¨ط± json_script ظ„ظ…ظ†ط¹ null ظپظٹ JS #}
 {{ words_json_url|default:''|json_script:"dj-words-json-url" }}
 
 <script>
-/* â”€â”€ ظ…طھط؛ظٹط±ط§طھ ظ…ط´طھط±ظƒط© â”€â”€ */
+
 var LESSON_ID  = JSON.parse(document.getElementById('dj-lesson-id').textContent);
 var SESSION_ID = JSON.parse(document.getElementById('dj-session-id').textContent);
 var CSRF_TOKEN = "{{ csrf_token }}";
@@ -287,27 +279,27 @@ var CHAT_URL   = "{% url 'student:lesson_chat' lesson.pk %}";
 var CHAT_LIMIT = JSON.parse(document.getElementById('dj-chat-limit').textContent);
 var CHAT_USED  = JSON.parse(document.getElementById('dj-chat-used').textContent);
 
-/* âœ… ط¥طµظ„ط§ط­: TIMING_URL ظ…ظ† words_json_url ط§ظ„ظ…ظڈظ…ط±ظژظ‘ط± طµط±ط§ط­ط©ظ‹ ظ…ظ† views.py */
+
 var TIMING_URL = (function(){
     try{
         var el  = document.getElementById('dj-words-json-url');
         var raw = el ? (JSON.parse(el.textContent || '""') || '') : '';
         if (!raw) return '';
-        /* ط¥ط°ط§ ظƒط§ظ† ط§ظ„ظ…ط³ط§ط± ظ†ط³ط¨ظٹط§ظ‹ ط£ط¶ظپ /media/ ظ…ط±ط© ظˆط§ط­ط¯ط© ظپظ‚ط· */
+        
         if (raw.indexOf('http') === 0) return raw;
         if (raw.indexOf('/') === 0)    return raw;
         return '/media/' + raw;
     } catch(e){ return ''; }
 })();
 
-/* â”€â”€ ط؛ظ„ط§ظپ طµظˆط±ط© ط§ظ„ط¯ط±ط³ â”€â”€ */
+
 (function(){
     try{
         var imgs = JSON.parse(document.getElementById('dj-image-list').textContent || '[]');
         if (!imgs || !imgs.length) return;
         var cover = document.getElementById('lesson-card-cover');
         if (!cover) return;
-        /* âœ… طھط¬ط§ظ‡ظ„ null ظپظٹ ظ‚ط§ط¦ظ…ط© ط§ظ„طµظˆط± */
+    
         var firstImg = null;
         for (var i = 0; i < imgs.length; i++) {
             if (imgs[i] && typeof imgs[i] === 'string' && imgs[i].trim()) {
@@ -321,7 +313,6 @@ var TIMING_URL = (function(){
     } catch(e){}
 })();
 
-/* â•گâ•گ طھطھط¨ط¹ ط§ظ„ط§ظ†طھط¨ط§ظ‡ â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
 var ws = null, trackingActive = false, alertTimer = null;
 var _mediaStream = null, _frameInterval = null;
 
@@ -488,7 +479,6 @@ function startTracking(){
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (d.ok && d.ws_url && typeof d.ws_url === 'string' && d.ws_url.indexOf('ws') === 0){
-            /* âœ… ط¥طµظ„ط§ط­: ظ†طھط­ظ‚ظ‚ ط£ظ† ws_url طµط§ظ„ط­ ظ‚ط¨ظ„ ط§ظ„ط§طھطµط§ظ„ â€” ظ„ظ…ظ†ط¹ new WebSocket(null) */
             trackingActive = true;
             connectWebSocket(d.ws_url);
             updateBar('attentive', 'التتبع نشط ✅', 100);
@@ -500,7 +490,7 @@ function startTracking(){
 }
 
 function connectWebSocket(wsUrl){
-    /* âœ… طھط­ظ‚ظ‚ ط¥ط¶ط§ظپظٹ ط¯ط§ط®ظ„ connectWebSocket ظ†ظپط³ظ‡ط§ */
+
     if (!wsUrl || typeof wsUrl !== 'string' || wsUrl.indexOf('ws') !== 0){
         console.warn('[Attention] Invalid ws_url:', wsUrl);
         hideAttentionBar();
@@ -657,7 +647,6 @@ function showSummary(s){
 
 window.addEventListener('beforeunload', function(){ if (trackingActive) stopTracking(); });
 
-/* â•گâ•گ ط¨ظ†ط§ط، ط§ظ„ظپظ‚ط±ط§طھ â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
 (function buildParagraphs(){
     var container = document.getElementById('lesson-paragraphs-container');
     if (!container) return;
@@ -671,7 +660,7 @@ window.addEventListener('beforeunload', function(){ if (trackingActive) stopTrac
     function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     paras.forEach(function(text, i){
-        /* âœ… طھط­ظ‚ظ‚ ظƒط§ظ…ظ„: imgUrl ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† string ط؛ظٹط± ظپط§ط±ط؛ ظˆط؛ظٹط± null */
+        
         var rawImg = imageList[i];
         var imgUrl = (rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg !== 'null')
                      ? rawImg.trim() : '';
@@ -694,7 +683,6 @@ window.addEventListener('beforeunload', function(){ if (trackingActive) stopTrac
             imgEl.src      = imgUrl;
             imgEl.className = 'std-para-img';
             imgEl.alt      = String(i+1);
-            /* âœ… ط¥ط®ظپط§ط، ط§ظ„طµظˆط±ط© ظپظˆط±ط§ظ‹ ط¥ط°ط§ ظپط´ظ„ ط§ظ„طھط­ظ…ظٹظ„ */
             imgEl.onerror  = function(){ this.style.display = 'none'; };
             imgEl.onclick  = (function(u){ return function(){ window.open(u,'_blank'); }; })(imgUrl);
             block.appendChild(imgEl);
@@ -702,11 +690,9 @@ window.addEventListener('beforeunload', function(){ if (trackingActive) stopTrac
         container.appendChild(block);
     });
 
-    /* طھط¸ظ„ظٹظ„ ط§ظ„ظپظ‚ط±ط© ط§ظ„ط£ظˆظ„ظ‰ */
     var firstBlock = container.querySelector('.std-para-block');
     if (firstBlock) firstBlock.classList.add('para-active');
 
-    /* طھط¸ظ„ظٹظ„ ط§ظ„ظپظ‚ط±ط© ط§ظ„ط­ط§ظ„ظٹط© ط¹ظ†ط¯ ط§ظ„طھط´ط؛ظٹظ„ */
     var audio = document.getElementById('topAudio');
     if (audio && paras.length > 0){
         audio.addEventListener('timeupdate', function(){
@@ -717,7 +703,6 @@ window.addEventListener('beforeunload', function(){ if (trackingActive) stopTrac
         });
     }
 
-    /* âœ… طھظ‡ظٹط¦ط© WordHighlight ط¨ط¹ط¯ ط¨ظ†ط§ط، ط§ظ„ظپظ‚ط±ط§طھ */
     var topAudio = document.getElementById('topAudio');
     if (topAudio && container){
         setTimeout(function(){
@@ -735,7 +720,6 @@ window.addEventListener('beforeunload', function(){ if (trackingActive) stopTrac
 })();
 </script>
 
-<!-- âœ… ظ…ط­ط±ظƒ ط§ظ„طھط¸ظ„ظٹظ„ ط§ظ„ظ…ط­ط³ظ‘ظ† v4 -->
 <script>
 (function(global){
 'use strict';
