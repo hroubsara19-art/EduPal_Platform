@@ -378,7 +378,7 @@ function setSpeed(s, btn) {
 /* â”€â”€ طھطھط¨ط¹ ط§ظ„ط§ظ†طھط¨ط§ظ‡ (طھظ… طھطµط­ظٹط­ طھط¯ط§ط®ظ„ Django ظˆ JS) â”€â”€ */
 // ط§ط³طھط®ط¯ط§ظ… ط¹ظ„ط§ظ…ط§طھ ط§ظ„طھظ†طµظٹطµ ظˆط§ظ„ط¯ظˆط§ظ„ ط§ظ„طھط­ظˆظٹظ„ظٹط© ظٹظ…ظ†ط¹ ط£ط®ط·ط§ط، VS Code Property assignment expected
 var LESSON_ID      = parseInt("{{ lesson.pk|escapejs }}") || 0;
-var SESSION_ID     = "lesson_" + LESSON_ID + "_student_0";
+var SESSION_ID     = "lesson_" + LESSON_ID + "_student_" + parseInt("{{ student.pk|default:0|escapejs }}") || 0;
 var CSRF_TOKEN     = "{{ csrf_token|escapejs }}";
 var ws             = null;
 var trackingActive = false;

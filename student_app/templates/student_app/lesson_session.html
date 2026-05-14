@@ -61,6 +61,16 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 #distraction-banner.drift{
   background:linear-gradient(135deg,#f8fafc,#f1f5f9);color:#475569;border-color:#cbd5e1;
 }
+#attention-bar.shake{animation:shake 0.35s ease-in-out;}
+@keyframes shake{
+  0%,100%{transform:translateX(0);}
+  20%,60%{transform:translateX(-6px);}
+  40%,80%{transform:translateX(6px);}
+}
+.word-token{transition:background .2s,color .2s;}
+.word-token.current-word{background:rgba(59,130,246,.18);color:#1e40af;border-radius:4px;}
+#lesson-paragraphs-container.paused .word-token{opacity:.5;}
+#lesson-paragraphs-container.paused .word-token.current-word{background:rgba(251,191,36,.2);color:#92400e;}
 
 /* â”€â”€ ط±ط£ط³ ط§ظ„ط¯ط±ط³ â”€â”€ */
 .lesson-header{
@@ -324,6 +334,12 @@ var TIMING_URL = (function(){
 /* â•گâ•گ طھطھط¨ط¹ ط§ظ„ط§ظ†طھط¨ط§ظ‡ â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
 var ws = null, trackingActive = false, alertTimer = null;
 var _mediaStream = null, _frameInterval = null;
+var _telemetryBatch = [];
+var _telemetryInterval = null;
+var _audioPausedForFocus = false;
+var _highlightPaused = false;
+var _wordTimingData = [];
+var _wordSpans = [];
 
 function firstAttentionName(full){
     if (!full || typeof full !== 'string') return '';
@@ -384,7 +400,147 @@ function updateDistractionBanner(s){
     el.className = sig ? 'significant' : (warn ? 'warning' : 'drift');
 }
 
-window.addEventListener('load', function(){ requestCameraAndStart(); });
+function _focusAudioAction(s){
+    if (!s || !document.getElementById('topAudio')) return;
+    var audio = document.getElementById('topAudio');
+    if (s.is_significant_distraction || s.attention_score < 40){
+        if (!audio.paused){ audio.pause(); _audioPausedForFocus = true; }
+        _highlightPaused = true;
+        document.body.classList.add('focus-paused');
+        pauseWordHighlight();
+        return;
+    }
+    if (s.is_warning_distraction || s.attention_score < 60){
+        /* تشتت متوسط: إبقاء الصوت متوقفاً مؤقتاً حتى يعود التركيز */
+        if (!audio.paused){ audio.pause(); _audioPausedForFocus = true; }
+        _highlightPaused = true;
+        document.body.classList.add('focus-paused');
+        pauseWordHighlight();
+        return;
+    }
+    if (_audioPausedForFocus && audio.paused){
+        audio.play().catch(function(){});
+    }
+    _audioPausedForFocus = false;
+    _highlightPaused = false;
+    document.body.classList.remove('focus-paused');
+    restoreWordHighlight();
+}
+
+function recordTelemetryState(s){
+    if (!s || typeof s.attention_score === 'undefined') return;
+    var score = Number(s.attention_score) || 0;
+    var level = 'focused';
+    if (s.is_significant_distraction || score < 40){
+        level = 'severe';
+    } else if (s.is_warning_distraction || score < 60){
+        level = 'medium';
+    } else if (score < 70){
+        level = 'light';
+    }
+    _telemetryBatch.push({
+        lesson_id: LESSON_ID,
+        session_id: SESSION_ID,
+        focus_score: score,
+        is_distracted: !s.is_attentive,
+        distraction_level: level,
+        focus_status: s.focus_status || '',
+        timestamp: Date.now(),
+    });
+    if (_telemetryBatch.length > 30){ _telemetryBatch.splice(0, _telemetryBatch.length - 30); }
+}
+
+function sendTelemetry(final){
+    if (!_telemetryBatch.length) return;
+    var batch = _telemetryBatch.slice();
+    _telemetryBatch = [];
+    var total = 0;
+    var distracted = false;
+    var levels = {light:0, medium:0, severe:0};
+    batch.forEach(function(item){ total += item.focus_score; if(item.is_distracted) distracted = true; if(levels[item.distraction_level] !== undefined) levels[item.distraction_level]++; });
+    var avg_score = Math.round((total / batch.length) * 10) / 10;
+    var level = levels.severe ? 'severe' : levels.medium ? 'medium' : levels.light ? 'light' : 'focused';
+
+    fetch("{% url 'student:attention_telemetry' %}", {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+        body: JSON.stringify({
+            lesson_id: LESSON_ID,
+            session_id: SESSION_ID,
+            focus_score: avg_score,
+            is_distracted: distracted,
+            distraction_level: level,
+            focus_status: batch[batch.length - 1].focus_status || ''
+        })
+    }).catch(function(){});
+}
+
+function pauseWordHighlight(){
+    var container = document.getElementById('lesson-paragraphs-container');
+    if (container){ container.classList.add('paused'); }
+}
+
+function restoreWordHighlight(){
+    var container = document.getElementById('lesson-paragraphs-container');
+    if (container){ container.classList.remove('paused'); }
+}
+
+function buildWordHighlight(){
+    if (!TIMING_URL) return;
+    fetch(TIMING_URL).then(function(r){ return r.json(); }).then(function(data){
+        if (!Array.isArray(data) || !data.length) return;
+        _wordTimingData = data;
+        var container = document.getElementById('lesson-paragraphs-container');
+        if (!container) return;
+        var blocks = container.querySelectorAll('.std-para-text');
+        var wordIndex = 0;
+        blocks.forEach(function(block){
+            var text = block.textContent || '';
+            var tokens = text.split(/(\s+)/);
+            var html = '';
+            tokens.forEach(function(token){
+                if (!token.trim()){
+                    html += token;
+                    return;
+                }
+                var index = wordIndex < _wordTimingData.length ? wordIndex : null;
+                if (index !== null){
+                    html += '<span class="word-token" data-word-index="' + index + '">' + token + '</span>';
+                    wordIndex += 1;
+                } else {
+                    html += '<span class="word-token">' + token + '</span>';
+                }
+            });
+            block.innerHTML = html;
+        });
+        _wordSpans = Array.from(document.querySelectorAll('.word-token'));
+        var audio = document.getElementById('topAudio');
+        if (audio){
+            audio.addEventListener('timeupdate', highlightAudioWord);
+        }
+    }).catch(function(){});
+}
+
+function highlightAudioWord(){
+    if (_highlightPaused) return;
+    var audio = document.getElementById('topAudio');
+    if (!audio || !_wordTimingData.length) return;
+    var currentTime = audio.currentTime;
+    var index = _wordTimingData.findIndex(function(item){
+        return currentTime >= item.start && currentTime < item.end;
+    });
+    if (index === -1){
+        index = _wordTimingData.length - 1;
+    }
+    _wordSpans.forEach(function(span){
+        span.classList.toggle('current-word', span.dataset.wordIndex == index);
+    });
+}
+
+window.addEventListener('load', function(){
+    buildWordHighlight();
+    requestCameraAndStart();
+});
 
 function requestCameraAndStart(){
     if (typeof navigator.permissions !== 'undefined' && typeof navigator.permissions.query === 'function'){
@@ -488,8 +644,10 @@ function startTracking(){
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (d.ok && d.ws_url && typeof d.ws_url === 'string' && d.ws_url.indexOf('ws') === 0){
-            /* âœ… ط¥طµظ„ط§ط­: ظ†طھط­ظ‚ظ‚ ط£ظ† ws_url طµط§ظ„ط­ ظ‚ط¨ظ„ ط§ظ„ط§طھطµط§ظ„ â€” ظ„ظ…ظ†ط¹ new WebSocket(null) */
+            /* ✅ تأكيد أن ws_url صالح */
             trackingActive = true;
+            if (_telemetryInterval){ clearInterval(_telemetryInterval); }
+            _telemetryInterval = setInterval(function(){ sendTelemetry(false); }, 5000);
             connectWebSocket(d.ws_url);
             updateBar('attentive', 'التتبع نشط ✅', 100);
         } else {
@@ -511,6 +669,8 @@ function connectWebSocket(wsUrl){
     ws.onmessage = function(e){
         var s = JSON.parse(e.data);
         if (s.error || s.pong) return;
+        recordTelemetryState(s);
+        _focusAudioAction(s);
         var warning = !!s.is_warning_distraction;
         var significant = !!s.is_significant_distraction;
         var fn = firstAttentionName(s.student_name || '');
@@ -521,6 +681,10 @@ function connectWebSocket(wsUrl){
                   s.attention_score);
         updateDistractionBanner(s);
         if (s.alert_message) showDistractionToast(s.alert_message, significant);
+        if (significant){
+            var bar = document.getElementById('attention-bar');
+            if (bar){ bar.classList.add('shake'); setTimeout(function(){ bar.classList.remove('shake'); }, 500); }
+        }
     };
     ws.onclose = function(){
         /* لا توقف الكاميرا هنا — إغلاق الـ WS يحدث أحياناً للإعادة التلقائية،
@@ -610,7 +774,10 @@ function setSpeed(s, btn){
 function stopTracking(){
     if (!trackingActive) return;
     clearDistractionBanner();
-    trackingActive = false; stopFrameSending(); if (ws) ws.close();
+    trackingActive = false;
+    sendTelemetry(true);
+    if (_telemetryInterval){ clearInterval(_telemetryInterval); _telemetryInterval = null; }
+    stopFrameSending(); if (ws) ws.close();
     var btn = document.getElementById('stop-btn');
     if (btn) btn.innerHTML = '<i class="fas fa-check"></i> تم';
     fetch("{% url 'student:attention_stop' %}", {

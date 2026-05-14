@@ -8,8 +8,11 @@ import re
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
-from learning.models import Parent, Performancereport, Student
+from django.shortcuts import get_object_or_404, redirect, render
+from learning.models import (
+    Parent, Performancereport, Student,
+    Learningsession, Attentionlog,
+)
 from accounts.models import Notification
 
 logger = logging.getLogger(__name__)
@@ -132,6 +135,147 @@ def parent_portal(request):
         'unread_notifications':  unread_notifications,
         'unread_count':          len(unread_notifications),
         'teacher_notes':         teacher_notes,
+    })
+
+
+@_parent_required
+def reports_dashboard(request):
+    parent = request.parent_obj
+    child = parent.childid
+
+    sessions = (
+        Learningsession.objects
+        .filter(studentid=child)
+        .select_related('lessonid')
+        .order_by('-starttime')
+    )
+
+    timeline = []
+    for session in sessions:
+        if session.avgfocusscore is None:
+            continue
+        timeline.append({
+            'date': session.starttime.strftime('%Y-%m-%d'),
+            'score': float(session.avgfocusscore),
+            'lesson': session.lessonid.lessontitle if session.lessonid else 'جلسة',
+            'session_id': session.sessionid,
+        })
+
+    overall_focus = round(
+        sum(item['score'] for item in timeline) / len(timeline), 1
+    ) if timeline else 0.0
+
+    distracted_logs = Attentionlog.objects.filter(
+        sessionid__in=sessions, isdistracted=True
+    )
+    from collections import Counter
+    hour_counts = Counter(log.logtime.hour for log in distracted_logs)
+    top_times = [
+        {'label': f'{hour:02d}:00', 'count': count}
+        for hour, count in hour_counts.most_common(3)
+    ]
+
+    recent_scores = [item['score'] for item in timeline[:5]]
+    previous_scores = [item['score'] for item in timeline[5:10]]
+    if recent_scores and previous_scores:
+        recent_avg = sum(recent_scores) / len(recent_scores)
+        previous_avg = sum(previous_scores) / len(previous_scores)
+        if recent_avg > previous_avg + 2:
+            insight_text = 'تحسن ملحوظ في تركيز الطفل خلال الجلسات الأخيرة.'
+        elif recent_avg < previous_avg - 2:
+            insight_text = 'هناك تراجع طفيف في جودة التركيز؛ يُنصح بإراحة الطفل قليلاً قبل الجلسة القادمة.'
+        else:
+            insight_text = 'التركيز ثابت مع بعض التحسن المستمر؛ استمر في دعم الطفل بالبيئة الهادئة.'
+    else:
+        insight_text = 'نحتاج المزيد من الجلسات لعرض تحليل دقيق لتحسين التركيز.'
+
+    return render(request, 'parent_app/reports_dashboard.html', {
+        'parent':     parent,
+        'child':      child,
+        'timeline':   timeline,
+        'overall_focus': overall_focus,
+        'top_times':  top_times,
+        'insight_text': insight_text,
+        'recent_sessions': sessions[:5],
+    })
+
+
+@_parent_required
+def child_report(request):
+    parent = request.parent_obj
+    child = parent.childid
+
+    sessions = (
+        Learningsession.objects
+        .filter(studentid=child)
+        .select_related('lessonid')
+        .order_by('-starttime')
+    )
+
+    rows = []
+    for session in sessions:
+        logs = Attentionlog.objects.filter(sessionid=session)
+        distracted = logs.filter(isdistracted=True).count()
+        total = logs.count() or 1
+        rows.append({
+            'session': session,
+            'lesson': session.lessonid.lessontitle if session.lessonid else 'جلسة',
+            'avg_focus': float(session.avgfocusscore or 0),
+            'distractions': distracted,
+            'focus_rate': round((total - distracted) / total * 100, 1),
+        })
+
+    return render(request, 'parent_app/child_report.html', {
+        'parent': parent,
+        'child': child,
+        'rows': rows,
+    })
+
+
+@_parent_required
+def session_details(request, session_id):
+    parent = request.parent_obj
+    child = parent.childid
+
+    session = get_object_or_404(
+        Learningsession,
+        sessionid=session_id,
+        studentid=child,
+    )
+    logs = list(Attentionlog.objects.filter(sessionid=session).order_by('logtime'))
+    timeline = []
+    total = len(logs) or 1
+    distracted = 0
+    for log in logs:
+        distracted = distracted + (1 if log.isdistracted else 0)
+        timeline.append({
+            'time': log.logtime.strftime('%H:%M:%S'),
+            'score': float(log.focuspercentage),
+            'status': log.isdistracted and log.actiontaken or 'focused',
+        })
+
+    focus_rate = round((total - distracted) / total * 100, 1)
+    insight = 'تحسن جيد في التركيز' if focus_rate >= 70 else 'يحتاج الطفل انتباهاً إضافياً خلال الجلسات المقبلة.'
+    if len(logs) >= 2:
+        first_half = logs[:len(logs)//2]
+        second_half = logs[len(logs)//2:]
+        first_avg = sum([float(l.focuspercentage) for l in first_half]) / len(first_half)
+        second_avg = sum([float(l.focuspercentage) for l in second_half]) / len(second_half)
+        if second_avg > first_avg + 1:
+            insight = 'التركيز تحسن في نهاية الجلسة مقارنة بالبداية.'
+        elif second_avg < first_avg - 1:
+            insight = 'لاحظنا انخفاضاً في التركيز مع تقدم الجلسة.'
+        else:
+            insight = 'تركيز الطفل ثابت طوال الجلسة.'
+
+    return render(request, 'parent_app/session_details.html', {
+        'parent': parent,
+        'child': child,
+        'session': session,
+        'timeline': timeline,
+        'focus_rate': focus_rate,
+        'distracted_count': distracted,
+        'insight': insight,
     })
 
 

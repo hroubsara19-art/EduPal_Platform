@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}تفاصيل الجلسة{% endblock %}
+{% block content %}
+<style>
+html, body { direction: rtl; }
+.detail-container { max-width: 960px; margin: 2.5rem auto; }
+.detail-card { background:#fff;border:1px solid #e2e8f0;border-radius:1rem;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 10px 24px rgba(15,23,42,.06); }
+.detail-card h2 { margin-bottom:1rem;font-size:1.25rem;font-weight:800; }
+.stats-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin-bottom:1.25rem; }
+.stat-box { background:#f8fafc;border-radius:.95rem;padding:1rem; }
+.stat-box strong { display:block;font-size:1.55rem;color:#1d4ed8; margin-bottom:.4rem; }
+.timeline-list { list-style:none;padding:0;margin:0; }
+.timeline-item { display:flex;justify-content:space-between;gap:1rem;padding:.95rem 1rem;border-bottom:1px solid #e2e8f0; }
+.timeline-item:last-child { border-bottom:none; }
+.tag { background:#e0f2fe;color:#0369a1;padding:.35rem .75rem;border-radius:999px;font-weight:700;font-size:.82rem; }
+.tag.distracted { background:#fee2e2;color:#b91c1c; }
+.tag.focused { background:#dcfce7;color:#166534; }
+</style>
+<div class="container-lg detail-container" lang="ar">
+  <div class="detail-card">
+    <h2>تفاصيل جلسة الدرس: {{ session.lessonid.lessontitle }}</h2>
+    <p style="color:#475569;">الجلسة بدأت في {{ session.starttime|date:'Y-m-d H:i' }}، وحصلت على معدل تركيز {{ session.avgfocusscore|default:'—' }}%.</p>
+  </div>
+  <div class="detail-card stats-grid">
+    <div class="stat-box"><strong>{{ focus_rate }}%</strong> نسبة التركيز</div>
+    <div class="stat-box"><strong>{{ distracted_count }}</strong> مرات التشتت</div>
+    <div class="stat-box"><strong>{{ timeline|length }}</strong> نقاط بيانات</div>
+  </div>
+  <div class="detail-card">
+    <h2>تحليلات ذكية</h2>
+    <p style="color:#475569;">{{ insight }}</p>
+  </div>
+  <div class="detail-card">
+    <h2>خط الزمن للتشتت</h2>
+    <ul class="timeline-list">
+      {% for row in timeline %}
+      <li class="timeline-item">
+        <span>{{ row.time }}</span>
+        <span>{{ row.score }}%</span>
+        <span class="tag {% if row.status != 'focused' %}distracted{% else %}focused{% endif %}">{{ row.status|capfirst }}</span>
+      </li>
+      {% empty %}
+      <li class="timeline-item" style="justify-content:center;color:#64748b;">لا توجد بيانات لتفاصيل الجلسة.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

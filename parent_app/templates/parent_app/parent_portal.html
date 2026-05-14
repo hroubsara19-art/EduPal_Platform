@@ -17,6 +17,10 @@
             <div>
                 <h1 class="hero-title mb-1">لوحة متابعة: {{ child.fullname }}</h1>
                 <p class="hero-sub mb-0">نظام EduPal — متابعة ذكية للأداء والتقدم الدراسي لطفلك.</p>
+                <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+                    <a href="{% url 'parent:reports_dashboard' %}" class="btn btn-primary" style="background:#1d4ed8;border-color:#1d4ed8;">لوحة تقارير التركيز</a>
+                    <a href="{% url 'parent:child_report' %}" class="btn btn-outline-primary" style="color:#1d4ed8;border-color:#bfdbfe;">تقرير الطفل</a>
+                </div>
             </div>
         </div>
     </div>
