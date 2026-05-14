@@ -15,14 +15,10 @@ import json
 import logging
 import requests
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404
-from learning.models import (
-    Student, Lessoncontent, Learningsession,
-    Performancereport, Attentionlog,
-)
+from learning.models import Student, Lessoncontent, Performancereport
 
 logger        = logging.getLogger(__name__)
 FLASK_BASE    = "http://localhost:5050"
@@ -182,76 +178,8 @@ def save_attention_report(request):
 
 
 # ══════════════════════════════════════════════════════════════
-# تلقي بيانات التركيز الدورية من الواجهة الأمامية
-# ══════════════════════════════════════════════════════════════
-@login_required
-@require_POST
-def attention_telemetry(request):
-    try:
-        data = json.loads(request.body)
-    except ValueError:
-        return JsonResponse({"error": "بيانات غير صالحة"}, status=400)
-
-    try:
-        lesson_id          = int(data.get("lesson_id", 0))
-        focus_score        = float(data.get("focus_score", 0))
-        distraction_level  = str(data.get("distraction_level", "")).strip().lower()
-        is_distracted      = bool(data.get("is_distracted", False))
-        focus_status       = str(data.get("focus_status", "")).strip()
-    except (ValueError, TypeError):
-        return JsonResponse({"error": "قيم غير صحيحة"}, status=400)
-
-    student = Student.objects.filter(
-        userid=request.user
-    ).select_related("classid").first()
-    if not student:
-        return JsonResponse({"error": "سجل الطالب غير موجود"}, status=400)
-
-    lesson = get_object_or_404(Lessoncontent, pk=lesson_id, status="Published")
-
-    session_obj = (
-        Learningsession.objects
-        .filter(studentid=student, lessonid=lesson)
-        .order_by('-starttime')
-        .first()
-    )
-    if not session_obj:
-        return JsonResponse({"error": "جلسة غير موجودة"}, status=404)
-
-    action = distraction_level or (
-        'severe' if focus_score < 40 else
-        'medium' if focus_score < 60 else
-        'light' if focus_score < 70 else
-        'focused'
-    )
-
-    try:
-        Attentionlog.objects.create(
-            sessionid=session_obj,
-            focuspercentage=round(focus_score, 2),
-            isdistracted=is_distracted,
-            actiontaken=action,
-        )
-    except Exception as e:
-        logger.error(f"فشل حفظ سجل التركيز: {e}")
-        return JsonResponse({"error": "تعذّر حفظ السجل"}, status=500)
-
-    avg_focus = (
-        Attentionlog.objects
-        .filter(sessionid=session_obj)
-        .aggregate(avg=Avg('focuspercentage'))
-        .get('avg')
-    )
-    if avg_focus is not None:
-        session_obj.avgfocusscore = round(avg_focus, 2)
-        session_obj.save(update_fields=['avgfocusscore'])
-
-    return JsonResponse({"ok": True})
-
-
-# ══════════════════════════════════════════════════════════════
 # إشعار تنبيه الانتباه لولي الأمر
-# ══════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
 @login_required
 @require_POST
 def notify_attention_alert(request):

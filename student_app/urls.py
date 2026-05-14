@@ -35,8 +35,6 @@ urlpatterns = [
          attention_views.attention_summary,      name='attention_summary'),
     path('attention/save/',
          attention_views.save_attention_report,  name='attention_save'),
-    path('attention/telemetry/',
-         attention_views.attention_telemetry,  name='attention_telemetry'),
     path('attention/alert/',
          attention_views.notify_attention_alert, name='attention_alert'),
 
