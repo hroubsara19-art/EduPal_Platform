@@ -341,6 +341,315 @@ var _attentionState = {
     pausedByDistraction: false,
 };
 
+// ══════════════════════════════════════════════════════════════
+// Audio/TTS Management Module
+// ══════════════════════════════════════════════════════════════
+var AudioManager = (function(){
+    'use strict';
+    
+    // Audio State Machine
+    var _state = {
+        lessonAudioPlaying: false,
+        ttsPlaying: false,
+        syncActive: false,
+        ttsQueue: [],
+        currentUtterance: null,
+        selectedVoice: null,
+        voiceInitialized: false,
+        lastAlertTime: 0,
+        lastAlertHash: '',
+        cleanupRequested: false
+    };
+    
+    var _config = {
+        ttsCooldown: 8000,           // 8 seconds between alerts
+        ttsQueueMax: 1,              // Keep only latest alert
+        ttsWaitAfterComplete: 1000,  // 1 second after TTS completes
+        maxMessageLength: 80,        // Truncate long messages
+        preferredVoiceGender: 'male',
+        preferredVoiceLang: 'ar-SA'
+    };
+    
+    var _timers = {
+        resumeCheck: null,
+        cooldown: null
+    };
+    
+    // ══════════════════════════════════════════════════════════════
+    // Voice Selection (ADHD-friendly)
+    // ══════════════════════════════════════════════════════════════
+    function _selectADHDFriendlyVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        
+        var voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) return null;
+        
+        // Priority 1: Arabic male voice (calm, natural)
+        var arabicMale = voices.filter(function(v){
+            return v.lang.indexOf('ar') === 0 && 
+                   (v.name.toLowerCase().indexOf('male') > -1 || 
+                    v.name.toLowerCase().indexOf('mohammed') > -1 ||
+                    v.name.toLowerCase().indexOf('hamed') > -1);
+        });
+        if (arabicMale.length > 0) return arabicMale[0];
+        
+        // Priority 2: Any Arabic voice
+        var arabic = voices.filter(function(v){ return v.lang.indexOf('ar') === 0; });
+        if (arabic.length > 0) return arabic[0];
+        
+        // Priority 3: Male voice in any language (natural sounding)
+        var male = voices.filter(function(v){
+            return v.name.toLowerCase().indexOf('male') > -1 ||
+                   v.name.toLowerCase().indexOf('david') > -1 ||
+                   v.name.toLowerCase().indexOf('daniel') > -1;
+        });
+        if (male.length > 0) return male[0];
+        
+        // Fallback: First available voice
+        return voices[0];
+    }
+    
+    function _initVoice() {
+        if (_state.voiceInitialized) return;
+        
+        if ('speechSynthesis' in window) {
+            // Load voices (async in some browsers)
+            if (window.speechSynthesis.getVoices().length === 0) {
+                window.speechSynthesis.onvoiceschanged = function(){
+                    _state.selectedVoice = _selectADHDFriendlyVoice();
+                    _state.voiceInitialized = true;
+                };
+            } else {
+                _state.selectedVoice = _selectADHDFriendlyVoice();
+                _state.voiceInitialized = true;
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════════
+    // Anti-Spam Logic
+    // ══════════════════════════════════════════════════════════════
+    function _hashMessage(msg) {
+        // Simple hash to detect duplicate messages
+        return msg.replace(/\s+/g, ' ').trim().substring(0, 30);
+    }
+    
+    function _shouldPlayAlert(msg, isFirm) {
+        var now = Date.now();
+        var msgHash = _hashMessage(msg);
+        
+        // Check cooldown
+        if (now - _state.lastAlertTime < _config.ttsCooldown) {
+            console.log('[Audio] Alert blocked by cooldown');
+            return false;
+        }
+        
+        // Check for duplicate message
+        if (msgHash === _state.lastAlertHash && now - _state.lastAlertTime < _config.ttsCooldown * 2) {
+            console.log('[Audio] Duplicate alert blocked');
+            return false;
+        }
+        
+        // Only play TTS for firm alerts
+        if (!isFirm) {
+            console.log('[Audio] Non-firm alert, TTS skipped');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function _truncateMessage(msg) {
+        if (msg.length <= _config.maxMessageLength) return msg;
+        return msg.substring(0, _config.maxMessageLength - 3) + '...';
+    }
+    
+    // ══════════════════════════════════════════════════════════════
+    // Audio Conflict Prevention
+    // ══════════════════════════════════════════════════════════════
+    function _stopLessonAudioAndSync() {
+        var audio = document.getElementById('topAudio');
+        if (audio && !audio.paused) {
+            audio.pause();
+            _state.lessonAudioPlaying = true;
+        }
+        
+        pauseWordHighlight();
+        _state.syncActive = false;
+    }
+    
+    function _resumeLessonAudioAndSync() {
+        // Only resume if tracking is still active and user is focused
+        if (!trackingActive) return;
+        
+        // Check current attention state before resuming
+        if (_attentionState.distracted) {
+            console.log('[Audio] Still distracted, not resuming');
+            return;
+        }
+        
+        var audio = document.getElementById('topAudio');
+        if (audio && audio.paused && _state.lessonAudioPlaying) {
+            audio.play().catch(function(e){
+                console.log('[Audio] Autoplay blocked:', e);
+            });
+            _state.lessonAudioPlaying = false;
+        }
+        
+        resumeWordHighlight();
+        _state.syncActive = true;
+    }
+    
+    function _onTTSComplete() {
+        console.log('[Audio] TTS completed');
+        _state.ttsPlaying = false;
+        _state.currentUtterance = null;
+        
+        // Wait extra second before checking attention
+        if (_timers.resumeCheck) clearTimeout(_timers.resumeCheck);
+        _timers.resumeCheck = setTimeout(function(){
+            if (_state.cleanupRequested) return;
+            _resumeLessonAudioAndSync();
+        }, _config.ttsWaitAfterComplete);
+    }
+    
+    function _playTTS(text) {
+        if (!('speechSynthesis' in window)) {
+            console.warn('[Audio] TTS not supported');
+            return;
+        }
+        
+        // Cancel any ongoing TTS
+        window.speechSynthesis.cancel();
+        
+        var utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = _config.preferredVoiceLang;
+        
+        if (_state.selectedVoice) {
+            utterance.voice = _state.selectedVoice;
+        }
+        
+        // ADHD-friendly settings
+        utterance.rate = 0.9;      // Slightly slower for clarity
+        utterance.pitch = 1.0;    // Natural pitch
+        utterance.volume = 0.85;  // Not too loud
+        
+        utterance.onend = _onTTSComplete;
+        utterance.onerror = function(e){
+            console.error('[Audio] TTS error:', e);
+            _state.ttsPlaying = false;
+            _state.currentUtterance = null;
+        };
+        
+        _state.currentUtterance = utterance;
+        _state.ttsPlaying = true;
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    // ══════════════════════════════════════════════════════════════
+    // Public API
+    // ══════════════════════════════════════════════════════════════
+    return {
+        init: function(){
+            _initVoice();
+            
+            // Track lesson audio state
+            var audio = document.getElementById('topAudio');
+            if (audio) {
+                audio.addEventListener('play', function(){
+                    _state.lessonAudioPlaying = true;
+                });
+                audio.addEventListener('pause', function(){
+                    _state.lessonAudioPlaying = false;
+                });
+                audio.addEventListener('ended', function(){
+                    _state.lessonAudioPlaying = false;
+                });
+            }
+        },
+        
+        playAlert: function(msg, isFirm){
+            if (_state.cleanupRequested) {
+                console.log('[Audio] Cleanup requested, alert blocked');
+                return;
+            }
+            
+            // Anti-spam check
+            if (!_shouldPlayAlert(msg, isFirm)) {
+                return false;
+            }
+            
+            // Truncate message
+            var shortMsg = _truncateMessage(msg);
+            
+            // Update state
+            _state.lastAlertTime = Date.now();
+            _state.lastAlertHash = _hashMessage(msg);
+            
+            // Queue management - keep only latest
+            _state.ttsQueue = [shortMsg];
+            
+            // Stop lesson audio and sync BEFORE playing TTS
+            _stopLessonAudioAndSync();
+            
+            // Play TTS
+            _playTTS(shortMsg);
+            
+            return true;
+        },
+        
+        stopAll: function(){
+            console.log('[Audio] Stopping all audio');
+            _state.cleanupRequested = true;
+            
+            // Cancel TTS
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            
+            // Clear timers
+            if (_timers.resumeCheck) {
+                clearTimeout(_timers.resumeCheck);
+                _timers.resumeCheck = null;
+            }
+            if (_timers.cooldown) {
+                clearTimeout(_timers.cooldown);
+                _timers.cooldown = null;
+            }
+            
+            // Stop lesson audio
+            var audio = document.getElementById('topAudio');
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+            
+            // Stop sync
+            pauseWordHighlight();
+            
+            // Clear queue
+            _state.ttsQueue = [];
+            _state.currentUtterance = null;
+            _state.ttsPlaying = false;
+            _state.lessonAudioPlaying = false;
+            _state.syncActive = false;
+        },
+        
+        isPlaying: function(){
+            return _state.ttsPlaying || _state.lessonAudioPlaying;
+        },
+        
+        getState: function(){
+            return {
+                ttsPlaying: _state.ttsPlaying,
+                lessonAudioPlaying: _state.lessonAudioPlaying,
+                syncActive: _state.syncActive,
+                queueLength: _state.ttsQueue.length
+            };
+        }
+    };
+})();
+
 function firstAttentionName(full){
     if (!full || typeof full !== 'string') return '';
     var p = full.trim().split(/\s+/);
@@ -524,7 +833,10 @@ function shakeUI() {
     setTimeout(function(){ container.classList.remove('shake-ui'); }, 520);
 }
 
-window.addEventListener('load', function(){ requestCameraAndStart(); });
+window.addEventListener('load', function(){ 
+    AudioManager.init();
+    requestCameraAndStart(); 
+});
 
 function requestCameraAndStart(){
     if (typeof navigator.permissions !== 'undefined' && typeof navigator.permissions.query === 'function'){
@@ -832,6 +1144,7 @@ function updateBar(cls, label, score){
 function showAlert(msg){
     var t = document.getElementById('alert-toast'); if (!t) return;
     t.textContent = msg;
+    t.style.background = 'linear-gradient(135deg,var(--sky-dk),var(--sky))';
     t.style.display = 'block';
     if (alertTimer) clearTimeout(alertTimer);
     alertTimer = setTimeout(function(){ t.style.display = 'none'; }, 5000);
@@ -846,9 +1159,9 @@ function showDistractionToast(msg, isFirm){
         : 'linear-gradient(135deg,#b45309,#ea580c)';
     t.style.display = 'block';
     
-    // تنبيه صوتي بسيط باسم الطالب
+    // تنبيه صوتي مع إدارة الصوت المتقدم
     if (isFirm) {
-        speakText(msg);
+        AudioManager.playAlert(msg, isFirm);
     }
 
     if (alertTimer) clearTimeout(alertTimer);
@@ -858,14 +1171,6 @@ function showDistractionToast(msg, isFirm){
     }, 6500);
 }
 
-function speakText(text) {
-    if ('speechSynthesis' in window) {
-        var utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ar-SA';
-        window.speechSynthesis.speak(utterance);
-    }
-}
-
 function handleMediaControl(s) {
     var audio = document.getElementById('topAudio');
     if (!audio) return;
@@ -873,17 +1178,24 @@ function handleMediaControl(s) {
     var level = s.distraction_level;
     var container = document.getElementById('lesson-paragraphs-container');
 
+    // Only pause audio if TTS is not playing (AudioManager handles this)
+    var audioState = AudioManager.getState();
+    if (audioState.ttsPlaying) {
+        // TTS is managing audio, don't interfere
+        return;
+    }
+
     if (level === 'medium' || level === 'high') {
         if (!audio.paused) {
             audio.pause();
             if (level === 'high') {
                 container.classList.add('shake-ui');
-                setTimeout(() => container.classList.remove('shake-ui'), 500);
+                setTimeout(function(){ container.classList.remove('shake-ui'); }, 500);
             }
         }
     } else if (s.is_attentive || level === 'low' || level === 'none') {
         if (audio.paused && trackingActive) {
-            audio.play().catch(e => console.log('Autoplay blocked'));
+            audio.play().catch(function(e){ console.log('Autoplay blocked'); });
         }
     }
 }
@@ -901,6 +1213,7 @@ function handleEyeClosureAlert(s) {
     if (_attentionState.eyeClosureCount >= 3) {
         showDistractionToast(fn + '، تم إيقاف الجلسة تلقائياً حفاظاً على سلامتك.', true);
         stopTracking();
+        return;
     }
 
     // إرسال تنبيه للأهل عبر Django
@@ -919,6 +1232,7 @@ function handleEyeClosureAlert(s) {
 function handleForceStop(studentName) {
     var fn = firstAttentionName(studentName || '') || 'صديقي';
     alert(fn + "، تم إيقاف الجلسة تلقائياً بسبب تكرار إغماض العينين. يرجى أخذ قسط من الراحة.");
+    AudioManager.stopAll();
     stopTracking();
     window.location.href = "{% url 'student:view_lesson_student' lesson.pk %}";
 }
@@ -931,9 +1245,16 @@ function setSpeed(s, btn){
 
 function stopTracking(){
     if (!trackingActive) return;
+    
+    // Complete audio cleanup first
+    AudioManager.stopAll();
     clearDistractionBanner();
     pauseLessonAudio();
-    trackingActive = false; stopFrameSending(); if (ws) ws.close();
+    
+    trackingActive = false; 
+    stopFrameSending(); 
+    if (ws) ws.close();
+    
     _attentionState = {
         distracted: false,
         startTime: null,
@@ -944,8 +1265,10 @@ function stopTracking(){
         eyeClosureEventActive: false,
         pausedByDistraction: false,
     };
+    
     var btn = document.getElementById('stop-btn');
     if (btn) btn.innerHTML = '<i class="fas fa-check"></i> تم';
+    
     fetch("{% url 'student:attention_stop' %}", {
         method:'POST',
         headers:{'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
@@ -988,7 +1311,10 @@ function showSummary(s){
     el.scrollIntoView({behavior:'smooth'});
 }
 
-window.addEventListener('beforeunload', function(){ if (trackingActive) stopTracking(); });
+window.addEventListener('beforeunload', function(){ 
+    AudioManager.stopAll();
+    if (trackingActive) stopTracking(); 
+});
 
 (function buildParagraphs(){
     var container = document.getElementById('lesson-paragraphs-container');
