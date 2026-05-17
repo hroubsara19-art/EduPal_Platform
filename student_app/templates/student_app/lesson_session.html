@@ -331,6 +331,7 @@ var TIMING_URL = (function(){
 
 var ws = null, trackingActive = false, alertTimer = null;
 var _mediaStream = null, _frameInterval = null;
+var _savedWsUrl = null;
 var _attentionState = {
     distracted: false,
     startTime: null,
@@ -340,6 +341,9 @@ var _attentionState = {
     eyeClosureCount: 0,
     eyeClosureEventActive: false,
     pausedByDistraction: false,
+    pausedByUser: false,
+    consecutiveDistractionCount: 0,
+    maxConsecutiveDistractions: 7,
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -374,6 +378,7 @@ var AudioManager = (function(){
         maxMessageLength: 80,        // Truncate long messages
         preferredVoiceGender: 'male',
         preferredVoiceLang: 'ar-SA',
+        preferredVoiceName: 'Microsoft Hamada - Arabic (Saudi Arabia)',
         minAttentionScore: 65,       // Minimum attention score to resume
         resumeCheckInterval: 500,    // Check every 500ms
         serverDataMaxAge: 2000       // Server data must be within 2 seconds
@@ -389,49 +394,57 @@ var AudioManager = (function(){
     // ══════════════════════════════════════════════════════════════
     function _selectADHDFriendlyVoice() {
         if (!('speechSynthesis' in window)) return null;
-        
+
         var voices = window.speechSynthesis.getVoices();
         if (!voices || voices.length === 0) return null;
-        
-        // Priority 1: Arabic male voice (calm, natural, clear)
+
+        // Priority 1: Specific preferred voice name (Hamada - male Arabic)
+        if (_config.preferredVoiceName) {
+            var preferred = voices.filter(function(v){
+                return v.name.indexOf(_config.preferredVoiceName) > -1;
+            });
+            if (preferred.length > 0) return preferred[0];
+        }
+
+        // Priority 2: Arabic male voice (calm, natural, clear)
         // Look for common Arabic male voice names
-        var arabicMalePatterns = ['male', 'mohammed', 'mohammad', 'ahmed', 'hamed', 'khalid', 'faisal', 'turki', 'naif'];
+        var arabicMalePatterns = ['male', 'mohammed', 'mohammad', 'ahmed', 'hamed', 'khalid', 'faisal', 'turki', 'naif', 'hamada'];
         var arabicMale = voices.filter(function(v){
             if (v.lang.indexOf('ar') !== 0) return false;
             var nameLower = v.name.toLowerCase();
-            return arabicMalePatterns.some(function(pattern){ 
-                return nameLower.indexOf(pattern) > -1; 
+            return arabicMalePatterns.some(function(pattern){
+                return nameLower.indexOf(pattern) > -1;
             });
         });
         if (arabicMale.length > 0) return arabicMale[0];
-        
-        // Priority 2: Any Arabic voice (prefer local service)
-        var arabic = voices.filter(function(v){ 
-            return v.lang.indexOf('ar') === 0 && v.localService; 
+
+        // Priority 3: Any Arabic voice (prefer local service)
+        var arabic = voices.filter(function(v){
+            return v.lang.indexOf('ar') === 0 && v.localService;
         });
         if (arabic.length > 0) return arabic[0];
-        
-        // Priority 3: Any Arabic voice (remote service)
-        var arabicRemote = voices.filter(function(v){ 
-            return v.lang.indexOf('ar') === 0; 
+
+        // Priority 4: Any Arabic voice (remote service)
+        var arabicRemote = voices.filter(function(v){
+            return v.lang.indexOf('ar') === 0;
         });
         if (arabicRemote.length > 0) return arabicRemote[0];
-        
-        // Priority 4: Male voice in any language (natural sounding, calm)
+
+        // Priority 5: Male voice in any language (natural sounding, calm)
         // Prefer voices with names suggesting calm, natural male voices
         var calmMalePatterns = ['male', 'david', 'daniel', 'james', 'thomas', 'alex', 'mark', 'paul'];
         var male = voices.filter(function(v){
             var nameLower = v.name.toLowerCase();
-            return calmMalePatterns.some(function(pattern){ 
-                return nameLower.indexOf(pattern) > -1; 
+            return calmMalePatterns.some(function(pattern){
+                return nameLower.indexOf(pattern) > -1;
             });
         });
         if (male.length > 0) return male[0];
-        
-        // Priority 5: Any local voice (better quality than remote)
+
+        // Priority 6: Any local voice (better quality than remote)
         var localVoices = voices.filter(function(v){ return v.localService; });
         if (localVoices.length > 0) return localVoices[0];
-        
+
         // Fallback: First available voice
         return voices[0];
     }
@@ -625,17 +638,29 @@ var AudioManager = (function(){
         init: function(){
             _initVoice();
             
-            // Track lesson audio state
+            // Track lesson audio state and link to attention tracking
             var audio = document.getElementById('topAudio');
             if (audio) {
                 audio.addEventListener('play', function(){
                     _state.lessonAudioPlaying = true;
+                    // Resume attention tracking when audio plays
+                    if (!trackingActive) {
+                        resumeTracking();
+                    }
                 });
                 audio.addEventListener('pause', function(){
                     _state.lessonAudioPlaying = false;
+                    // Pause attention tracking when audio pauses
+                    if (trackingActive) {
+                        pauseTracking();
+                    }
                 });
                 audio.addEventListener('ended', function(){
                     _state.lessonAudioPlaying = false;
+                    // Pause attention tracking when audio ends
+                    if (trackingActive) {
+                        pauseTracking();
+                    }
                 });
             }
         },
@@ -821,6 +846,7 @@ function processAttentionState(s) {
             _attentionState.startTime = now;
             _attentionState.lastAlertLevel = null;
             _attentionState.lastToastLevel = null;
+            _attentionState.consecutiveDistractionCount++;
         }
         duration = (now - (_attentionState.startTime || now)) / 1000;
         var level = duration >= 7 ? 'long' : duration >= 3 ? 'medium' : 'short';
@@ -835,9 +861,16 @@ function processAttentionState(s) {
                 showDistractionToast(toastMsg, toastLevel !== 'low');
             }
         }
+
+        // Check for consecutive distractions limit
+        if (_attentionState.consecutiveDistractionCount >= _attentionState.maxConsecutiveDistractions) {
+            handleConsecutiveDistractionsLimit();
+            return;
+        }
     } else {
         if (_attentionState.distracted) {
             showDistractionToast('جميل، لقد عدت للتركيز. استمر الآن!', false);
+            _attentionState.consecutiveDistractionCount = 0; // Reset counter on attention return
         }
         _attentionState.distracted = false;
         _attentionState.level = 'none';
@@ -882,8 +915,13 @@ function pauseLessonAudio() {
 
 function resumeLessonAudio() {
     var audio = document.getElementById('topAudio');
-    if (audio && audio.paused && trackingActive) {
-        audio.play().catch(function(){});
+    // لا تُشغّل التسجيل الصوتي مباشرة
+    // يجب أولاً التأكد من أن الطالب منتبهاً حسب خوارزمية تتبع الانتباه
+    // سيتم التحقق في دالة _resumeLessonAudioAndSync
+    if (audio && audio.paused && trackingActive && !_sessionState.pausedByUser) {
+        // التحقق من الانتباه يتم في دالة _resumeLessonAudioAndSync
+        // هنا نستخدم AudioManager للتحديث حالة الانتباه
+        AudioManager.updateServerAttentionState(true, 100);
     }
     resumeWordHighlight();
 }
@@ -1064,6 +1102,7 @@ function startTracking(){
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (d.ok && d.ws_url && typeof d.ws_url === 'string'){
+            _savedWsUrl = d.ws_url;
             trackingActive = true;
             connectWebSocket(d.ws_url);
             updateBar('attentive', 'التتبع نشط ✅', 100);
@@ -1108,6 +1147,8 @@ function connectWebSocket(wsUrl){
     ws.onopen = function(){
         showAlert('تم الاتصال بخادم تتبع الانتباه');
         startFrameSending();
+        // Update UI to show tracking is active after reconnection
+        updateBar('attentive', 'التتبع نشط ✅', 100);
     };
     ws.onerror = function(err){
         console.warn('[Attention] WebSocket error', err);
@@ -1116,10 +1157,10 @@ function connectWebSocket(wsUrl){
     ws.onmessage = function(e){
         var s = JSON.parse(e.data);
         if (s.error || s.type === 'pong') return;
-        
+
         // Update AudioManager with latest server attention state
         AudioManager.updateServerAttentionState(s.is_attentive, s.attention_score);
-        
+
         // التعامل مع الإغلاق القسري (إغماض العينين 3 مرات)
         if (s.should_force_stop) {
             handleForceStop(s.student_name);
@@ -1133,17 +1174,17 @@ function connectWebSocket(wsUrl){
         var fn = firstAttentionName(s.student_name || '');
         var neg = significant ? 'تشتت ملحوظ في الجلسة' : (warning ? 'حاول ترجع للتركيز' : 'لحظة بسيطة بعيد عن الدرس');
         var label = s.is_attentive ? 'منتبه ✅' : (fn ? (fn + '، ' + neg) : neg);
-        
+
         updateBar(s.is_attentive ? 'attentive' : ((warning || significant) ? 'distracted' : ''),
                   label,
                   s.attention_score);
         updateDistractionBanner(s);
-        
+
         // نظام التحكم في الوسائط بناءً على مستوى التشتت
         handleMediaControl(s);
 
         if (s.alert_message) showDistractionToast(s.alert_message, significant);
-        
+
         // تنبيه إغماض العينين (3 ثواني)
         if (s.eye_closure_duration >= 3.0) {
             handleEyeClosureAlert(s);
@@ -1189,6 +1230,11 @@ function startFrameSending(){
 function stopFrameSending(){
     stopFrameIntervalOnly();
     if (_mediaStream){ _mediaStream.getTracks().forEach(function(t){ t.stop(); }); _mediaStream = null; }
+}
+
+function pauseFrameSending(){
+    // Stop frame interval only, keep camera stream active
+    stopFrameIntervalOnly();
 }
 
 function normalizeAttentionScore(value){
@@ -1321,10 +1367,65 @@ function handleForceStop(studentName) {
     window.location.href = "{% url 'student:view_lesson_student' lesson.pk %}";
 }
 
+function handleConsecutiveDistractionsLimit() {
+    var fn = 'صديقي';
+    alert(fn + "، تم إيقاف الجلسة تلقائياً بسبب تكرار التشتت " + _attentionState.maxConsecutiveDistractions + " مرات متتالية. يرجى أخذ قسط من الراحة والمحاولة لاحقاً.");
+    AudioManager.stopAll();
+    stopTracking();
+    window.location.href = "{% url 'student:view_lesson_student' lesson.pk %}";
+}
+
 function setSpeed(s, btn){
     var a = document.getElementById('topAudio'); if (a) a.playbackRate = s;
     btn.closest('.audio-speeds').querySelectorAll('.spd-btn').forEach(function(b){ b.classList.remove('active'); });
     btn.classList.add('active');
+}
+
+function pauseTracking(){
+    if (!trackingActive) return;
+
+    trackingActive = false;
+    pauseFrameSending();  // Keep camera stream active
+    if (ws) ws.close();
+
+    _attentionState.pausedByUser = true;
+
+    // Stop lesson audio and highlighting
+    pauseLessonAudio();
+    pauseWordHighlight();
+
+    updateBar('', 'التتبع متوقف مؤقتاً ⏸️', 0);
+
+    var btn = document.getElementById('stop-btn');
+    if (btn) btn.innerHTML = '<i class="fas fa-play-circle"></i> استئناف';
+    btn.onclick = resumeTracking;
+}
+
+function resumeTracking(){
+    if (trackingActive) return;
+
+    _attentionState.pausedByUser = false;
+
+    // Ensure camera is still active
+    if (!_mediaStream) {
+        // Camera was stopped, need to re-request it
+        _doCameraRequest();
+        return;
+    }
+
+    if (_savedWsUrl) {
+        // Reconnect to existing WebSocket without creating new session
+        trackingActive = true;
+        connectWebSocket(_savedWsUrl);
+        updateBar('', 'جارٍ إعادة الاتصال... انتظر التحقق من الانتباه', 50);
+    } else {
+        // Fallback: create new session if no saved URL
+        startTracking();
+    }
+
+    var btn = document.getElementById('stop-btn');
+    if (btn) btn.innerHTML = '<i class="fas fa-stop-circle"></i> إيقاف';
+    btn.onclick = stopTracking;
 }
 
 function stopTracking(){
@@ -1348,6 +1449,7 @@ function stopTracking(){
         eyeClosureCount: _attentionState.eyeClosureCount || 0,
         eyeClosureEventActive: false,
         pausedByDistraction: false,
+        pausedByUser: false,
     };
     
     var btn = document.getElementById('stop-btn');

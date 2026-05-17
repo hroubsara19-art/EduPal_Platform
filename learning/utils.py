@@ -365,7 +365,7 @@ async def generate_audio_async(text: str, file_path: str) -> str | None:
     if not clean:
         raise ValueError('النص فارغ بعد التنظيف')
 
-    communicate = edge_tts.Communicate(clean, 'ar-EG-SalmaNeural')
+    communicate = edge_tts.Communicate(clean, 'ar-SA-HamadaNeural')
     audio_bytes: bytearray  = bytearray()
     word_timings: list[dict] = []
 
@@ -393,7 +393,7 @@ async def generate_audio_async(text: str, file_path: str) -> str | None:
     else:
         # fallback: save() مباشرة (بدون WordBoundary)
         logger.warning('[utils] stream() returned no audio bytes, using save() fallback')
-        communicate2 = edge_tts.Communicate(clean, 'ar-EG-SalmaNeural')
+        communicate2 = edge_tts.Communicate(clean, 'ar-SA-HamadaNeural')
         await communicate2.save(full_path)
 
     # ── حفظ timing JSON ────────────────────────────────────

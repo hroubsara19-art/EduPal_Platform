@@ -142,18 +142,105 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 }
 .video-note strong { font-weight: 800; }
 
+/* ══ Attention Tracking System ═════════════════════════════════ */
+.attention-tracking-overlay {
+  position: fixed; top: 0; right: 0; width: 180px; height: 180px;
+  background: #000; border-radius: 16px; border: 3px solid var(--blue);
+  z-index: 5000; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+.attention-camera { width: 100%; height: 100%; object-fit: cover; }
+.camera-indicator {
+  position: absolute; top: 8px; right: 8px; width: 10px; height: 10px;
+  background: #ef4444; border-radius: 50%; box-shadow: 0 0 8px #ef4444;
+  animation: pulse-red 1.5s infinite;
+}
+@keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+.attention-alert {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: var(--white); padding: 2rem 2.5rem; border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); z-index: 5001;
+  text-align: center; max-width: 500px; display: none;
+  animation: slideIn 0.3s ease-out;
+}
+.attention-alert.show { display: block; }
+.attention-alert-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: var(--purple-lt); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem; color: var(--purple);
+}
+.attention-alert-title { font-size: 1.5rem; font-weight: 800; color: var(--ink); margin-bottom: .5rem; }
+.attention-alert-text { font-size: .95rem; color: var(--muted); line-height: 1.8; font-family: 'Tajawal', sans-serif; }
+
+.attention-status {
+  position: fixed; bottom: 20px; right: 20px; padding: .8rem 1.5rem;
+  background: var(--white); border: 2px solid var(--border);
+  border-radius: 12px; font-size: .85rem; font-weight: 700;
+  color: var(--slate); z-index: 4999; display: flex; align-items: center; gap: .6rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+.status-indicator {
+  width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite;
+}
+.status-indicator.attentive { background: #10b981; }
+.status-indicator.distracted { background: #ef4444; animation: pulse-red 1s infinite; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: .7; }
+}
+
+.attention-toggle-btn {
+  position: fixed; bottom: 20px; left: 20px; width: 50px; height: 50px;
+  background: var(--blue); color: #fff; border: none; border-radius: 50%;
+  font-size: 1.2rem; cursor: pointer; z-index: 4999; box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  transition: all .2s; display: flex; align-items: center; justify-content: center;
+}
+.attention-toggle-btn:hover { background: var(--blue-dk); transform: scale(1.1); }
+.attention-toggle-btn.disabled { background: var(--muted); cursor: not-allowed; }
+
 @media(max-width: 768px) {
   .lesson-video-wrap { padding: 1.5rem 1rem 4rem; }
   .video-header { padding: 1.5rem; }
   .video-body { padding: 1.5rem; }
   .lesson-info-section { padding: 1.5rem; }
   .lesson-info-grid { grid-template-columns: 1fr; }
+  .attention-tracking-overlay { width: 120px; height: 120px; }
+  .attention-status { bottom: 80px; right: 10px; font-size: .75rem; }
+  .attention-toggle-btn { left: 10px; width: 45px; height: 45px; font-size: 1rem; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="lesson-video-wrap" dir="rtl" lang="ar">
+  <!-- ══ Attention Tracking System ════════════════════════════════ -->
+  <div class="attention-tracking-overlay" id="attentionCameraOverlay" style="display: none;">
+    <video id="attentionCamera" class="attention-camera" playsinline></video>
+    <div class="camera-indicator"></div>
+  </div>
+
+  <div class="attention-alert" id="attentionAlert">
+    <div class="attention-alert-icon">
+      <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <h3 class="attention-alert-title">انتبه!</h3>
+    <p class="attention-alert-text" id="attentionAlertText">يرجى العودة للتركيز على الفيديو</p>
+  </div>
+
+  <div class="attention-status" id="attentionStatus" style="display: none;">
+    <div class="status-indicator attentive" id="statusIndicator"></div>
+    <span id="statusText">متركز</span>
+  </div>
+
+  <button class="attention-toggle-btn" id="attentionToggleBtn" onclick="toggleAttentionTracking()" title="تفعيل/تعطيل تتبع الانتباه">
+    <i class="fas fa-camera"></i>
+  </button>
+
+  <!-- ══ Hidden audio element for alerts ════════════════════════ -->
+  <audio id="attentionAlertSound" preload="auto"></audio>
+  <audio id="videoAudio" style="display: none;"></audio>
+
   <a href="{% url 'student:view_lesson_student' lesson.pk %}" class="back-link">
     <i class="fas fa-arrow-right"></i>
     العودة إلى صفحة الدرس
@@ -219,4 +306,502 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
     </div>
   </div>
 </div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// Attention Tracking System - Foundation & State Management
+// ══════════════════════════════════════════════════════════════
+
+const AttentionTracker = {
+  // ── State ─────────────────────────────────────────────────────
+  isEnabled: false,
+  isTracking: false,
+  cameraActive: false,
+  videoPlaying: false,
+  attentionState: 'attentive',
+  distractionStartTime: null,
+  distractionDuration: 0,
+  shortAlertShown: false,
+  longAlertActive: false,
+  videoStream: null,
+  studentName: '{{ request.user.fullname }}' || 'طالب',
+  alertAudioPlaying: false,
+  trackingCheckInterval: null,
+  distractionCheckInterval: null,
+  cameraPermissionAsked: false,
+  wasTrackingBeforePause: false,
+  simulationStartTime: null,
+
+  // ── Configuration ─────────────────────────────────────────────
+  config: {
+    shortDistraction: 3000,    // 3 seconds - text alert only
+    longDistraction: 5000,     // 5 seconds - text + audio + pause
+    attentionCheckRate: 500,   // Check every 500ms
+    attentionConfirmDelay: 1000, // 1 second before resuming video
+    cameraDimensions: { width: 180, height: 180 }
+  },
+
+  init: function() {
+    console.log('[AttentionTracker] Initializing...');
+    this.setupEventListeners();
+    this.setupVideoControls();
+    this.autoRequestCameraOnFirstPlay();
+  },
+
+  setupEventListeners: function() {
+    const video = document.querySelector('.video-player');
+    if (!video) return;
+
+    video.addEventListener('play', () => this.onVideoPlay());
+    video.addEventListener('pause', () => this.onVideoPause());
+    video.addEventListener('ended', () => this.onVideoEnded());
+  },
+
+  autoRequestCameraOnFirstPlay: function() {
+    const video = document.querySelector('.video-player');
+    if (!video) return;
+
+    const requestCameraOnce = () => {
+      if (!this.cameraActive && !this.cameraPermissionAsked) {
+        this.cameraPermissionAsked = true;
+        console.log('[AttentionTracker] Auto-requesting camera');
+        this.requestCameraPermission();
+      }
+      video.removeEventListener('play', requestCameraOnce);
+    };
+
+    video.addEventListener('play', requestCameraOnce, { once: true });
+  },
+
+  setupVideoControls: function() {
+    const video = document.querySelector('.video-player');
+    if (!video) return;
+
+    // Store original play method
+    const originalPlay = video.play.bind(video);
+    video.play = function() {
+      if (AttentionTracker.isTracking && AttentionTracker.attentionState === 'distracted') {
+        console.log('[AttentionTracker] Cannot play - student distracted');
+        return Promise.reject('Student distracted');
+      }
+      return originalPlay();
+    };
+  },
+
+  // ── Camera & Tracking Control ──────────────────────────────────
+  toggleAttentionTracking: function() {
+    if (!this.isEnabled) {
+      this.enableTracking();
+    } else {
+      this.disableTracking();
+    }
+  },
+
+  enableTracking: async function() {
+    console.log('[AttentionTracker] Enabling tracking...');
+    try {
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
+      });
+
+      this.videoStream = stream;
+      this.cameraActive = true;
+      this.isEnabled = true;
+      this.isTracking = true;
+
+      // Attach stream to video element
+      const cameraVideo = document.getElementById('attentionCamera');
+      if (cameraVideo) {
+        cameraVideo.srcObject = stream;
+        document.getElementById('attentionCameraOverlay').style.display = 'block';
+      }
+
+      this.updateUI();
+      this.startAttentionMonitoring();
+      console.log('[AttentionTracker] Tracking enabled');
+    } catch (error) {
+      console.error('[AttentionTracker] Camera access denied:', error);
+      alert('يرجى السماح بالوصول للكاميرا لتفعيل نظام تتبع الانتباه');
+      this.isEnabled = false;
+      this.updateUI();
+    }
+  },
+
+  requestCameraPermission: async function() {
+    console.log('[AttentionTracker] Requesting camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
+      });
+      this.setupCameraStream(stream);
+    } catch (error) {
+      console.warn('[AttentionTracker] Camera denied:', error);
+    }
+  },
+
+  setupCameraStream: function(stream) {
+    this.videoStream = stream;
+    this.cameraActive = true;
+    this.isEnabled = true;
+
+    const cameraVideo = document.getElementById('attentionCamera');
+    if (cameraVideo) {
+      cameraVideo.srcObject = stream;
+      document.getElementById('attentionCameraOverlay').style.display = 'block';
+    }
+
+    this.updateUI();
+    console.log('[AttentionTracker] Camera ready');
+  },
+
+  enableTracking: async function() {
+    console.log('[AttentionTracker] Enabling tracking');
+    if (this.cameraActive) {
+      this.isTracking = true;
+      if (this.videoPlaying) {
+        this.startAttentionMonitoring();
+      }
+      this.updateUI();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
+      });
+      this.setupCameraStream(stream);
+      this.isTracking = true;
+      if (this.videoPlaying) {
+        this.startAttentionMonitoring();
+      }
+    } catch (error) {
+      console.error('[AttentionTracker] Camera error:', error);
+      alert('يرجى السماح بالوصول للكاميرا');
+      this.isEnabled = false;
+      this.updateUI();
+    }
+  },
+
+  disableTracking: function() {
+    console.log('[AttentionTracker] Disabling tracking');
+    this.isTracking = false;
+    this.stopAttentionMonitoring();
+    this.clearAlerts();
+
+    if (this.videoStream) {
+      this.videoStream.getTracks().forEach(track => track.stop());
+      this.videoStream = null;
+    }
+
+    this.cameraActive = false;
+    this.isEnabled = false;
+    document.getElementById('attentionCameraOverlay').style.display = 'none';
+    this.updateUI();
+  },
+
+  onVideoPlay: function() {
+    console.log('[AttentionTracker] Video playing');
+    this.videoPlaying = true;
+    
+    if (this.wasTrackingBeforePause && this.cameraActive && !this.isTracking) {
+      console.log('[AttentionTracker] Resuming tracking');
+      this.isTracking = true;
+      this.resetDistractionState();
+      this.startAttentionMonitoring();
+    } else if (this.isTracking) {
+      this.startAttentionMonitoring();
+    }
+  },
+
+  onVideoPause: function() {
+    console.log('[AttentionTracker] Video paused');
+    this.videoPlaying = false;
+    
+    if (this.isTracking) {
+      this.wasTrackingBeforePause = true;
+    }
+    
+    this.stopAttentionMonitoring();
+    this.clearAlerts();
+  },
+
+  onVideoEnded: function() {
+    console.log('[AttentionTracker] Video ended');
+    this.videoPlaying = false;
+    this.wasTrackingBeforePause = false;
+    this.stopAttentionMonitoring();
+    this.clearAlerts();
+    this.disableTracking();
+  },
+
+  resetDistractionState: function() {
+    this.attentionState = 'attentive';
+    this.distractionStartTime = null;
+    this.distractionDuration = 0;
+    this.shortAlertShown = false;
+    this.longAlertActive = false;
+  },
+
+  // ── Attention Monitoring ──────────────────────────────────────
+  startAttentionMonitoring: function() {
+    if (this.trackingCheckInterval) return;
+
+    console.log('[AttentionTracker] Starting attention monitoring');
+    this.trackingCheckInterval = setInterval(() => {
+      this.checkAttentionState();
+      this.updateDistraction();
+    }, this.config.attentionCheckRate);
+  },
+
+  stopAttentionMonitoring: function() {
+    if (this.trackingCheckInterval) {
+      clearInterval(this.trackingCheckInterval);
+      this.trackingCheckInterval = null;
+    }
+    console.log('[AttentionTracker] Stopped attention monitoring');
+  },
+
+  checkAttentionState: function() {
+    const newState = this.simulateAttentionDetection();
+    
+    if (newState !== this.attentionState) {
+      console.log('[AttentionTracker] Attention state:', newState);
+      this.attentionState = newState;
+      this.updateUI();
+
+      if (newState === 'attentive') {
+        this.onAttentiveDetected();
+      } else if (newState === 'distracted') {
+        this.distractionStartTime = Date.now();
+      }
+    }
+  },
+
+  simulateAttentionDetection: function() {
+    if (!this.simulationStartTime) {
+      this.simulationStartTime = Date.now();
+    }
+    
+    const elapsed = (Date.now() - this.simulationStartTime) / 1000;
+    const cycle = (elapsed % 11);
+    return cycle < 8 ? 'attentive' : 'distracted';
+  },
+
+  captureFrame: function() {
+    const video = document.getElementById('attentionCamera');
+    if (!video) return null;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    return canvas;
+  },
+
+  updateDistraction: function() {
+    if (this.attentionState === 'distracted' && this.distractionStartTime) {
+      this.distractionDuration = Date.now() - this.distractionStartTime;
+
+      // Short distraction (3 seconds)
+      if (this.distractionDuration >= this.config.shortDistraction && !this.shortAlertShown) {
+        this.showShortAlert();
+        this.shortAlertShown = true;
+      }
+
+      // Long distraction (5 seconds)
+      if (this.distractionDuration >= this.config.longDistraction && !this.longAlertActive) {
+        this.showLongAlert();
+        this.longAlertActive = true;
+      }
+    }
+  },
+
+  // ── Alert Management ──────────────────────────────────────────
+  showShortAlert: function() {
+    console.log('[AttentionTracker] Short alert - Gentle reminder');
+    const alerts = [
+      `${this.studentName}، تابع معنا!`,
+      `${this.studentName}، التركيز قليلاً`,
+      `${this.studentName}، عودة للفيديو`
+    ];
+    const alertText = alerts[Math.floor(Math.random() * alerts.length)];
+    
+    const alertElement = document.getElementById('attentionAlert');
+    const textElement = document.getElementById('attentionAlertText');
+    const icon = alertElement.querySelector('.attention-alert-icon');
+    
+    if (icon) {
+      icon.innerHTML = '<i class="fas fa-lightbulb"></i>';
+    }
+    
+    textElement.textContent = alertText;
+    alertElement.classList.add('show');
+
+    setTimeout(() => {
+      if (this.attentionState === 'distracted') return;
+      alertElement.classList.remove('show');
+    }, 2000);
+  },
+
+  showLongAlert: function() {
+    console.log('[AttentionTracker] Long alert - Video paused');
+    const video = document.querySelector('.video-player');
+    if (video && !video.paused) {
+      video.pause();
+    }
+
+    const alertElement = document.getElementById('attentionAlert');
+    const textElement = document.getElementById('attentionAlertText');
+    const icon = alertElement.querySelector('.attention-alert-icon');
+    
+    if (icon) {
+      icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+    }
+    
+    const alertText = `${this.studentName}\nالفيديو موقوف - يرجى العودة للتركيز`;
+    textElement.textContent = alertText;
+    alertElement.classList.add('show');
+
+    this.playAudioAlert(this.studentName);
+  },
+
+  playAudioAlert: function(studentName) {
+    console.log('[AttentionTracker] Playing audio alert');
+    
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+      
+      const messages = [
+        `${studentName}, عودة معنا من فضلك`,
+        `${studentName}, الفيديو ينتظرك`,
+        `${studentName}, ركز قليلاً معنا`
+      ];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      
+      const utterance = new SpeechSynthesisUtterance(message);
+      utterance.lang = 'ar';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.8;
+      
+      this.muteVideoAudio();
+      this.alertAudioPlaying = true;
+
+      utterance.onend = () => {
+        console.log('[AttentionTracker] Audio finished');
+        this.alertAudioPlaying = false;
+        this.unmuteVideoAudio();
+      };
+
+      utterance.onerror = (error) => {
+        console.error('[AttentionTracker] Speech error:', error);
+        this.alertAudioPlaying = false;
+        this.unmuteVideoAudio();
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+  },
+
+  onAttentiveDetected: function() {
+    console.log('[AttentionTracker] Attentive detected - resuming');
+    
+    this.distractionStartTime = null;
+    this.distractionDuration = 0;
+    this.shortAlertShown = false;
+
+    if (this.longAlertActive) {
+      this.longAlertActive = false;
+      
+      if ('speechSynthesis' in window) {
+        speechSynthesis.cancel();
+      }
+      
+      setTimeout(() => {
+        this.clearAlerts();
+        this.resumeVideoAfterAttention();
+      }, this.config.attentionConfirmDelay);
+    } else {
+      this.clearAlerts();
+    }
+
+    this.updateUI();
+  },
+
+  resumeVideoAfterAttention: function() {
+    console.log('[AttentionTracker] Resuming video after attention confirmed');
+    const video = document.querySelector('.video-player');
+    if (video && video.paused) {
+      video.play().catch(err => console.error('[AttentionTracker] Resume error:', err));
+    }
+  },
+
+  clearAlerts: function() {
+    const alertElement = document.getElementById('attentionAlert');
+    if (alertElement) {
+      alertElement.classList.remove('show');
+      const icon = alertElement.querySelector('.attention-alert-icon');
+      if (icon) {
+        icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+      }
+    }
+    
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+    this.alertAudioPlaying = false;
+    this.unmuteVideoAudio();
+  },
+
+  muteVideoAudio: function() {
+    const video = document.querySelector('.video-player');
+    if (video) video.volume = 0;
+  },
+
+  unmuteVideoAudio: function() {
+    const video = document.querySelector('.video-player');
+    if (video) video.volume = 1;
+  },
+
+  // ── UI Updates ─────────────────────────────────────────────────
+  updateUI: function() {
+    const toggleBtn = document.getElementById('attentionToggleBtn');
+    const statusElement = document.getElementById('attentionStatus');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+
+    // Update toggle button
+    if (this.isEnabled) {
+      toggleBtn.classList.remove('disabled');
+      toggleBtn.innerHTML = '<i class="fas fa-camera-slash"></i>';
+      statusElement.style.display = 'flex';
+    } else {
+      toggleBtn.classList.add('disabled');
+      toggleBtn.innerHTML = '<i class="fas fa-camera"></i>';
+      statusElement.style.display = 'none';
+      return;
+    }
+
+    // Update status indicator
+    if (this.attentionState === 'attentive') {
+      statusIndicator.className = 'status-indicator attentive';
+      statusText.textContent = 'متركز';
+    } else {
+      statusIndicator.className = 'status-indicator distracted';
+      statusText.textContent = `مشتت (${Math.round(this.distractionDuration / 1000)}s)`;
+    }
+  }
+};
+
+function toggleAttentionTracking() {
+  AttentionTracker.toggleAttentionTracking();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[AttentionTracker] Initializing system');
+  AttentionTracker.init();
+});
+</script>
 {% endblock %}

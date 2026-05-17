@@ -445,8 +445,6 @@ function confirmDelete() {
   .catch(function(error) {
     console.error('Error:', error);
     alert(error.message || 'حدث خطأ أثناء الحذف');
-  })
-  .finally(function() {
     closeDeleteModal();
   });
 }
