@@ -355,7 +355,7 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
             <i class="fas fa-edit"></i>
             تعديل
           </a>
-          <button class="action-btn btn-delete" onclick="showDeleteModal({{ lesson.pk }})">
+          <button class="action-btn btn-delete" data-lesson-id="{{ lesson.pk }}" onclick="showDeleteModal(this)">
             <i class="fas fa-trash"></i>
             حذف
           </button>
@@ -410,8 +410,8 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 <script>
 var lessonToDelete = null;
 
-function showDeleteModal(lessonId) {
-  lessonToDelete = lessonId;
+function showDeleteModal(button) {
+  lessonToDelete = button.getAttribute('data-lesson-id');
   document.getElementById('deleteModal').classList.add('active');
 }
 
@@ -423,7 +423,7 @@ function closeDeleteModal() {
 function confirmDelete() {
   if (!lessonToDelete) return;
 
-  var deleteUrl = "{% url 'learning:delete_lesson_video' lesson_id=0 %}".replace('0', lessonToDelete);
+  var deleteUrl = "/teacher/delete-lesson-video/" + lessonToDelete + "/";
   fetch(deleteUrl, {
     method: 'POST',
     headers: {
