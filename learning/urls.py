@@ -31,6 +31,10 @@ urlpatterns = [
     # ── إنشاء الاختبار ────────────────────────────────────────
     path('teacher/create-test/',            learning_views.create_test,       name='create_test'),
 
+    # ── أدوات توليد الفيديو بالذكاء الاصطناعي ───────────────────
+    path('teacher/ai-video-tools/',         learning_views.ai_video_tools,    name='ai_video_tools'),
+    path('teacher/upload-lesson-video/',    learning_views.upload_lesson_video, name='upload_lesson_video'),
+
     # ── إدارة الاختبارات (معلم) ──────────────────────────────
     path('teacher/test/<int:test_id>/',        learning_views.teacher_test_detail, name='teacher_test_detail'),
     path('teacher/test/<int:test_id>/delete/', learning_views.delete_test,         name='delete_test'),

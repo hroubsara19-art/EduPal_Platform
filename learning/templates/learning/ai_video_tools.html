@@ -1,0 +1,549 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إنتاج وإدارة الفيديوهات التعليمية — EduPal{% endblock %}
+
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700&display=swap');
+:root {
+  --blue:      #1d4ed8;
+  --blue-dk:   #1e3a5f;
+  --blue-lt:   #eff4ff;
+  --blue-bd:   #bfdbfe;
+  --teal:      #0f766e;
+  --teal-lt:   #f0fdfa;
+  --teal-bd:   #99f6e4;
+  --purple:    #6d28d9;
+  --purple-lt: #f5f3ff;
+  --slate:     #475569;
+  --slate-lt:  #f8fafc;
+  --ink:       #1e293b;
+  --muted:     #64748b;
+  --border:    #e2e8f0;
+  --bg:        #f3f6fb;
+  --white:     #ffffff;
+  --r:         14px;
+  --sh:        0 1px 4px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.05);
+  --sh-h:      0 6px 20px rgba(0,0,0,.10), 0 20px 48px rgba(0,0,0,.08);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { direction: rtl; }
+body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color: var(--ink); }
+.page-wrap { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+
+/* ══ Header ═══════════════════════════════════════════════════ */
+.page-header {
+  background: linear-gradient(125deg, #1e3a5f 0%, #1d4ed8 55%, #2563eb 100%);
+  border-radius: 20px; padding: 2.5rem 3rem;
+  display: flex; align-items: center; gap: 2rem;
+  position: relative; overflow: hidden;
+  box-shadow: 0 8px 40px rgba(29,78,216,.28);
+  margin-bottom: 2rem;
+}
+.page-header::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 88% 20%, rgba(255,255,255,.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 80%, rgba(255,255,255,.05) 0%, transparent 50%);
+}
+.header-icon {
+  width: 72px; height: 72px; flex-shrink: 0;
+  background: rgba(255,255,255,.16); border: 1.5px solid rgba(255,255,255,.28);
+  border-radius: 18px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; color: #fff; backdrop-filter: blur(4px);
+}
+.header-text h1 { font-size: clamp(1.5rem, 2.5vw, 2.2rem); font-weight: 900; color: #fff; margin: 0 0 .5rem; line-height: 1.2; }
+.header-text p  { font-size: 1rem; color: rgba(255,255,255,.85); margin: 0; font-family: 'Tajawal', sans-serif; line-height: 1.8; }
+.back-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .6rem 1.2rem; border-radius: 10px;
+  background: rgba(255,255,255,.15); color: #fff;
+  border: 1.5px solid rgba(255,255,255,.28);
+  font-size: .9rem; font-weight: 700;
+  text-decoration: none; transition: all .2s;
+  margin-left: auto;
+}
+.back-btn:hover { background: rgba(255,255,255,.25); text-decoration: none; color: #fff; }
+
+/* ══ Section Label ═══════════════════════════════════════════════ */
+.sec-lbl {
+  font-size: 1.05rem; font-weight: 800; color: var(--ink);
+  display: flex; align-items: center; gap: .6rem;
+  margin-bottom: 1.5rem; padding-right: .8rem;
+  border-right: 4px solid var(--blue);
+}
+.sec-lbl i { color: var(--blue); }
+
+/* ══ AI Tools Grid ═══════════════════════════════════════════════ */
+.ai-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+@media(max-width: 1200px) { .ai-tools-grid { grid-template-columns: repeat(3, 1fr); } }
+@media(max-width: 900px) { .ai-tools-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width: 600px) { .ai-tools-grid { grid-template-columns: 1fr; } }
+
+.ai-tool-btn {
+  background: var(--white); border: 2px solid var(--border);
+  border-radius: 16px; padding: 1.5rem;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1rem; text-decoration: none; color: inherit;
+  transition: all .25s ease; position: relative; overflow: hidden;
+}
+.ai-tool-btn::before {
+  content: ''; position: absolute; top: 0; right: 0; left: 0;
+  height: 4px; background: var(--blue); opacity: 0; transition: opacity .25s;
+}
+.ai-tool-btn:hover { transform: translateY(-4px); box-shadow: var(--sh-h); border-color: var(--blue-bd); }
+.ai-tool-btn:hover::before { opacity: 1; }
+
+.ai-tool-logo {
+  width: 64px; height: 64px; border-radius: 14px;
+  background: var(--blue-lt); color: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; flex-shrink: 0;
+}
+
+.ai-tool-name { font-size: 1rem; font-weight: 800; color: var(--ink); text-align: center; }
+.ai-tool-badge {
+  font-size: .75rem; font-weight: 700;
+  background: #fef3c7; color: #b45309;
+  border: 1px solid #fde68a; border-radius: 100px;
+  padding: .25rem .7rem; display: inline-block;
+}
+
+/* ══ Content Input Section ═════════════════════════════════════ */
+.content-section {
+  background: var(--white); border: 2px solid var(--border);
+  border-radius: 20px; padding: 2.5rem;
+  margin-bottom: 3rem; box-shadow: var(--sh);
+}
+
+.form-group { margin-bottom: 1.5rem; }
+.form-label {
+  display: block; font-size: .9rem; font-weight: 700; color: var(--ink);
+  margin-bottom: .6rem; display: flex; align-items: center; gap: .5rem;
+}
+.form-label i { color: var(--blue); }
+.form-input {
+  width: 100%; padding: .85rem 1.2rem;
+  border: 2px solid var(--border); border-radius: 12px;
+  font-family: 'Cairo', sans-serif; font-size: .95rem; color: var(--ink);
+  background: var(--slate-lt); transition: border-color .2s;
+}
+.form-input:focus { border-color: var(--blue); outline: none; }
+.form-textarea {
+  width: 100%; padding: 1rem 1.2rem;
+  border: 2px solid var(--border); border-radius: 12px;
+  font-family: 'Cairo', sans-serif; font-size: .95rem; color: var(--ink);
+  background: var(--slate-lt); transition: border-color .2s;
+  min-height: 150px; resize: vertical;
+}
+.form-textarea:focus { border-color: var(--blue); outline: none; }
+
+/* ══ Video Upload Section ═════════════════════════════════════ */
+.video-section {
+  background: var(--white); border: 2px solid var(--border);
+  border-radius: 20px; padding: 2.5rem;
+  box-shadow: var(--sh);
+}
+
+.upload-area {
+  border: 3px dashed var(--border);
+  border-radius: 16px; padding: 3rem 2rem;
+  text-align: center;
+  background: var(--slate-lt);
+  transition: all .3s ease; cursor: pointer;
+  position: relative;
+}
+.upload-area:hover { border-color: var(--blue); background: var(--blue-lt); }
+.upload-area.dragover { border-color: var(--blue); background: var(--blue-lt); transform: scale(1.02); }
+
+.upload-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: var(--white); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem; color: var(--blue); box-shadow: var(--sh);
+}
+.upload-title { font-size: 1.2rem; font-weight: 800; color: var(--ink); margin-bottom: .5rem; }
+.upload-desc { font-size: .9rem; color: var(--muted); font-family: 'Tajawal', sans-serif; line-height: 1.8; margin-bottom: 1.5rem; }
+.upload-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .75rem 1.5rem; border-radius: 12px;
+  font-size: .95rem; font-weight: 700;
+  background: var(--blue); color: #fff; border: none;
+  cursor: pointer; transition: all .2s;
+}
+.upload-btn:hover { background: var(--blue-dk); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(29,78,216,.3); }
+
+#videoInput { display: none; }
+
+/* ══ Video Preview ═════════════════════════════════════════════ */
+.video-preview {
+  margin-top: 2rem; display: none;
+}
+.video-preview.active { display: block; }
+
+.video-preview video {
+  width: 100%; max-height: 500px;
+  border-radius: 16px; background: #000;
+  box-shadow: var(--sh);
+}
+
+.video-actions {
+  display: flex; gap: 1rem; margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .7rem 1.4rem; border-radius: 12px;
+  font-size: .9rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; border: none;
+}
+
+.btn-save { background: var(--teal); color: #fff; }
+.btn-save:hover { background: #0d6e6e; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15,118,110,.3); }
+
+.btn-delete { background: #ef4444; color: #fff; }
+.btn-delete:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239,68,68,.3); }
+
+.btn-cancel { background: var(--slate); color: #fff; }
+.btn-cancel:hover { background: var(--muted); transform: translateY(-2px); }
+
+/* ══ Info Box ═════════════════════════════════════════════════ */
+.info-box {
+  background: linear-gradient(135deg, #f0fdfa 0%, #eff4ff 100%);
+  border: 2px solid var(--teal-bd);
+  border-radius: 16px; padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+  display: flex; align-items: flex-start; gap: 1rem;
+}
+.info-icon {
+  width: 48px; height: 48px; flex-shrink: 0;
+  background: var(--teal); color: #fff;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+}
+.info-text h3 { font-size: 1.1rem; font-weight: 800; color: var(--ink); margin: 0 0 .5rem; }
+.info-text p { font-size: .92rem; color: var(--muted); line-height: 1.8; margin: 0; font-family: 'Tajawal', sans-serif; }
+
+/* ══ Lesson Selector ═════════════════════════════════════════ */
+.lesson-select {
+  width: 100%; padding: .85rem 1.2rem;
+  border: 2px solid var(--border); border-radius: 12px;
+  font-family: 'Cairo', sans-serif; font-size: .95rem; color: var(--ink);
+  background: var(--slate-lt); transition: border-color .2s;
+}
+.lesson-select:focus { border-color: var(--blue); outline: none; }
+
+@media(max-width: 768px) {
+  .page-header { flex-direction: column; text-align: center; padding: 2rem 1.5rem; }
+  .back-btn { margin-left: 0; margin-top: 1rem; }
+  .page-wrap { padding: 1.5rem 1rem 4rem; }
+  .content-section, .video-section { padding: 1.5rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" dir="rtl" lang="ar">
+
+  <!-- ══ Header ════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-icon"><i class="fas fa-video"></i></div>
+    <div class="header-text">
+      <h1>إنتاج وإدارة الفيديوهات التعليمية</h1>
+      <p>استخدم أدوات الذكاء الاصطناعي لإنشاء فيديوهات تعليمية مخصصة لدرسك</p>
+    </div>
+    <a href="{% url 'learning:teacher_dashboard' %}" class="back-btn">
+      <i class="fas fa-arrow-right"></i>
+      العودة للوحة التحكم
+    </a>
+  </div>
+
+  <!-- ══ Info Box ════════════════════════════════════════════════ -->
+  <div class="info-box">
+    <div class="info-icon"><i class="fas fa-lightbulb"></i></div>
+    <div class="info-text">
+      <h3>دليل إنتاج الفيديو التعليمي</h3>
+      <p>اختر أداة الذكاء الاصطناعي لإنشاء الفيديو، ثم ارفعه هنا لربطه بالدرس. يدعم النظام فيديوهات حتى 15 دقيقة أو أكثر.</p>
+    </div>
+  </div>
+
+  <!-- ══ AI Tools Section ════════════════════════════════════════════════ -->
+  <div class="sec-lbl"><i class="fas fa-robot"></i> أدوات الذكاء الاصطناعي للفيديو</div>
+  <div class="ai-tools-grid">
+
+    <!-- Veed (Free Trial) -->
+    <a href="https://www.veed.io" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-play-circle"></i></div>
+      <div class="ai-tool-name">Veed</div>
+      <span class="ai-tool-badge">مجاني</span>
+    </a>
+
+    <!-- HeyGen -->
+    <a href="https://www.heygen.com" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-user-tie"></i></div>
+      <div class="ai-tool-name">HeyGen</div>
+      <span class="ai-tool-badge">مجاني</span>
+    </a>
+
+    <!-- Synthesia -->
+    <a href="https://www.synthesia.io" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-robot"></i></div>
+      <div class="ai-tool-name">Synthesia</div>
+    </a>
+
+    <!-- D-ID -->
+    <a href="https://www.d-id.com" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-id-card"></i></div>
+      <div class="ai-tool-name">D-ID</div>
+      <span class="ai-tool-badge">مجاني</span>
+    </a>
+
+    <!-- Pictory -->
+    <a href="https://pictory.ai" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-film"></i></div>
+      <div class="ai-tool-name">Pictory</div>
+    </a>
+
+    <!-- Runway ML -->
+    <a href="https://runwayml.com" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-magic"></i></div>
+      <div class="ai-tool-name">Runway ML</div>
+    </a>
+
+    <!-- Lumen5 -->
+    <a href="https://lumen5.com" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-lightbulb"></i></div>
+      <div class="ai-tool-name">Lumen5</div>
+      <span class="ai-tool-badge">مجاني</span>
+    </a>
+
+    <!-- InVideo -->
+    <a href="https://invideo.io" target="_blank" class="ai-tool-btn">
+      <div class="ai-tool-logo"><i class="fas fa-video"></i></div>
+      <div class="ai-tool-name">InVideo</div>
+      <span class="ai-tool-badge">مجاني</span>
+    </a>
+
+  </div>
+
+  <!-- ══ Lesson Selection ════════════════════════════════════════════════ -->
+  <div class="content-section">
+    <div class="sec-lbl"><i class="fas fa-book"></i> اختيار الدرس</div>
+    <div class="form-group">
+      <label class="form-label">
+        <i class="fas fa-graduation-cap"></i>
+        اختر الدرس المراد ربط الفيديو به
+      </label>
+      <select id="lessonSelect" class="lesson-select">
+        <option value="">-- اختر الدرس --</option>
+        {% for lesson in lessons %}
+        <option value="{{ lesson.pk }}">{{ lesson.lessontitle }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- ══ Content Input Section ════════════════════════════════════════════════ -->
+  <div class="content-section">
+    <div class="sec-lbl"><i class="fas fa-edit"></i> إدخال محتوى الدرس</div>
+    
+    <div class="form-group">
+      <label class="form-label">
+        <i class="fas fa-heading"></i>
+        عنوان الفيديو (اختياري)
+      </label>
+      <input type="text" id="videoTitle" class="form-input" placeholder="أدخل عنواناً للفيديو">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <i class="fas fa-align-right"></i>
+        النص الأصلي للدرس
+      </label>
+      <textarea id="lessonText" class="form-textarea" placeholder="أدخل النص الأصلي للدرس هنا... سيتم استخدامه كمرجع عند إنشاء الفيديو"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <i class="fas fa-info-circle"></i>
+        محتوى داعم إضافي (اختياري)
+      </label>
+      <textarea id="supportContent" class="form-textarea" placeholder="أدخل أي محتوى داعم إضافي مثل ملاحظات أو نقاط رئيسية..." style="min-height: 100px;"></textarea>
+    </div>
+  </div>
+
+  <!-- ══ Video Upload Section ════════════════════════════════════════════════ -->
+  <div class="video-section">
+    <div class="sec-lbl"><i class="fas fa-upload"></i> رفع وإدارة الفيديو</div>
+    
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">
+        <i class="fas fa-cloud-upload-alt"></i>
+      </div>
+      <div class="upload-title">اسحب وأفلت الفيديو هنا</div>
+      <div class="upload-desc">
+        أو انقر لاختيار ملف الفيديو من جهازك<br>
+        يدعم MP4, WebM, MOV حتى 500MB (فيديوهات حتى 15 دقيقة أو أكثر)
+      </div>
+      <button class="upload-btn" onclick="document.getElementById('videoInput').click()">
+        <i class="fas fa-folder-open"></i>
+        اختر ملف الفيديو
+      </button>
+      <input type="file" id="videoInput" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo">
+    </div>
+
+    <!-- Video Preview -->
+    <div class="video-preview" id="videoPreview">
+      <video id="previewVideo" controls></video>
+      <div class="video-actions">
+        <button class="action-btn btn-save" onclick="saveVideo()">
+          <i class="fas fa-save"></i>
+          حفظ الفيديو
+        </button>
+        <button class="action-btn btn-delete" onclick="deleteVideo()">
+          <i class="fas fa-trash"></i>
+          حذف
+        </button>
+        <button class="action-btn btn-cancel" onclick="cancelUpload()">
+          <i class="fas fa-times"></i>
+          إلغاء
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var selectedFile = null;
+
+// Handle file selection
+document.getElementById('videoInput').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (file) {
+    selectedFile = file;
+    showPreview(file);
+  }
+});
+
+// Handle drag and drop
+var uploadArea = document.getElementById('uploadArea');
+
+uploadArea.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', function(e) {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) {
+    selectedFile = file;
+    showPreview(file);
+  } else {
+    alert('يرجى اختيار ملف فيديو صالح');
+  }
+});
+
+uploadArea.addEventListener('click', function() {
+  document.getElementById('videoInput').click();
+});
+
+function showPreview(file) {
+  var preview = document.getElementById('videoPreview');
+  var video = document.getElementById('previewVideo');
+  var url = URL.createObjectURL(file);
+  
+  video.src = url;
+  preview.classList.add('active');
+  uploadArea.style.display = 'none';
+}
+
+function cancelUpload() {
+  var preview = document.getElementById('videoPreview');
+  var video = document.getElementById('previewVideo');
+  
+  video.src = '';
+  preview.classList.remove('active');
+  uploadArea.style.display = 'block';
+  selectedFile = null;
+  document.getElementById('videoInput').value = '';
+}
+
+function deleteVideo() {
+  if (confirm('هل أنت متأكد من حذف هذا الفيديو؟')) {
+    cancelUpload();
+  }
+}
+
+function saveVideo() {
+  var lessonId = document.getElementById('lessonSelect').value;
+  var videoTitle = document.getElementById('videoTitle').value;
+  var lessonText = document.getElementById('lessonText').value;
+  var supportContent = document.getElementById('supportContent').value;
+  
+  if (!lessonId) {
+    alert('يرجى اختيار الدرس أولاً');
+    return;
+  }
+  
+  if (!selectedFile) {
+    alert('يرجى اختيار ملف الفيديو أولاً');
+    return;
+  }
+  
+  var formData = new FormData();
+  formData.append('lesson_id', lessonId);
+  formData.append('video_file', selectedFile);
+  if (videoTitle) formData.append('video_title', videoTitle);
+  if (lessonText) formData.append('lesson_text', lessonText);
+  if (supportContent) formData.append('support_content', supportContent);
+  
+  fetch("{% url 'learning:upload_lesson_video' %}", {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: formData
+  })
+  .then(function(response) {
+    if (!response.ok) throw new Error('Failed to upload video');
+    return response.json();
+  })
+  .then(function(data) {
+    if (data.success) {
+      alert('تم رفع الفيديو بنجاح!');
+      cancelUpload();
+    } else {
+      alert(data.error || 'حدث خطأ أثناء رفع الفيديو');
+    }
+  })
+  .catch(function(error) {
+    console.error('Error:', error);
+    alert('حدث خطأ أثناء رفع الفيديو');
+  });
+}
+
+function getCookie(name) {
+  var value = '; ' + document.cookie;
+  var parts = value.split('; ' + name + '=');
+  if (parts.length == 2) return parts.pop().split(';').shift();
+}
+</script>
+{% endblock %}

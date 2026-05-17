@@ -126,6 +126,223 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 .tool-card.tc-teal:hover   .tc-cta { background: var(--teal);   }
 .tool-card.tc-purple:hover .tc-cta { background: var(--purple); }
 
+/* ══ Advanced Tools Modal ═════════════════════════════════════ */
+#advancedToolsModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+#advancedToolsModal.active { display: flex; }
+
+.modal-content {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 2.5rem 3rem;
+  max-width: 900px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--slate-lt);
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--border);
+  color: var(--ink);
+  transform: rotate(90deg);
+}
+
+.advanced-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+@media(max-width: 768px) {
+  .advanced-tools-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-content {
+    padding: 2rem 1.5rem;
+  }
+}
+
+.advanced-tool-card {
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.advanced-tool-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: var(--blue);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.advanced-tool-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  border-color: var(--blue-bd);
+}
+
+.advanced-tool-card:hover::before {
+  opacity: 1;
+}
+
+.advanced-tool-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--slate-lt);
+}
+
+.advanced-tool-card.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
+.advanced-tool-card.disabled::before {
+  background: var(--muted);
+}
+
+.atc-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--blue-lt);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.atc-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.atc-desc {
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.8;
+  font-family: 'Tajawal', sans-serif;
+  flex: 1;
+}
+
+.atc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  align-self: flex-start;
+}
+
+.atc-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  align-self: flex-start;
+}
+
+.atc-cta:hover {
+  background: var(--blue-dk);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+}
+
+.advanced-tool-card.disabled .atc-cta {
+  background: var(--muted);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.advanced-tool-card.disabled .atc-cta:hover {
+  background: var(--muted);
+  transform: none;
+  box-shadow: none;
+}
+
 /* ══ Panel ═══════════════════════════════════════════════════ */
 .panel { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--r); box-shadow: var(--sh); overflow: hidden; }
 .panel-head {
@@ -269,12 +486,12 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
       <span class="tc-cta"><i class="fas fa-plus-circle"></i> أنشئ الآن</span>
     </a>
 
-    <a href="#" class="tool-card tc-purple">
+    <div class="tool-card tc-purple" onclick="openAdvancedToolsModal()" style="cursor: pointer;">
       <div class="tc-icon"><i class="fas fa-tools"></i></div>
       <div class="tc-title">أدوات تعليمية متقدمة</div>
       <div class="tc-desc">مجموعة أدوات مساعدة لتطوير تجربة التعليم ورفع تفاعل طلابك.</div>
       <span class="tc-cta"><i class="fas fa-compass"></i> استكشف</span>
-    </a>
+    </div>
 
   </div>
 
@@ -432,6 +649,56 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
     <div style="font-weight:700;color:#1e293b;">جاري تحديث النتائج…</div>
   </div>
 </div>
+
+<!-- Advanced Tools Modal -->
+<div id="advancedToolsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="fas fa-tools" style="color: var(--purple);"></i>
+        الأدوات التعليمية المتقدمة
+      </div>
+      <button class="modal-close" onclick="closeAdvancedToolsModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="advanced-tools-grid">
+      <!-- AI Video Generation Card -->
+      <div class="advanced-tool-card">
+        <div class="atc-icon">
+          <i class="fas fa-video"></i>
+        </div>
+        <div class="atc-title">توليد فيديو باستخدام الذكاء الاصطناعي</div>
+        <div class="atc-desc">
+          أنشئ فيديو تعليمي مخصص للدرس بالاعتماد على أدوات ذكاء اصطناعي خارجية متقدمة.
+        </div>
+        <a href="{% url 'learning:ai_video_tools' %}" class="atc-cta">
+          <i class="fas fa-play-circle"></i>
+          ابدأ
+        </a>
+      </div>
+
+      <!-- VR Environment Card (Disabled) -->
+      <div class="advanced-tool-card disabled">
+        <div class="atc-icon">
+          <i class="fas fa-vr-cardboard"></i>
+        </div>
+        <div class="atc-title">تصميم بيئة واقع افتراضي للدرس</div>
+        <div class="atc-desc">
+          أنشئ تجربة واقع افتراضي مرتبطة بمحتوى الدرس لرفع مستوى التفاعل والفهم.
+        </div>
+        <span class="atc-badge">
+          <i class="fas fa-clock"></i>
+          قريباً
+        </span>
+        <button class="atc-cta" disabled>
+          <i class="fas fa-lock"></i>
+          غير متاح
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -450,6 +717,41 @@ window.addEventListener('pageshow', function () {
   if (_filterTimer) clearTimeout(_filterTimer);
   var ov = document.getElementById('filterOverlay');
   if (ov) ov.style.display = 'none';
+});
+
+// Advanced Tools Modal Functions
+function openAdvancedToolsModal() {
+  var modal = document.getElementById('advancedToolsModal');
+  if (modal) {
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeAdvancedToolsModal() {
+  var modal = document.getElementById('advancedToolsModal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(e) {
+  var modal = document.getElementById('advancedToolsModal');
+  if (modal && modal.classList.contains('active')) {
+    var content = modal.querySelector('.modal-content');
+    if (content && !content.contains(e.target) && e.target === modal) {
+      closeAdvancedToolsModal();
+    }
+  }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeAdvancedToolsModal();
+  }
 });
 </script>
 {% endblock %}

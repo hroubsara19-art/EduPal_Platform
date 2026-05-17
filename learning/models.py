@@ -277,6 +277,13 @@ class Lessoncontent(models.Model):
     ai_audiopath      = models.TextField(db_column='AI_AudioPath',  null=True, blank=True)
     ai_generatedtext  = models.TextField(db_column='AI_GeneratedText', null=True, blank=True)
     ai_videopath      = models.TextField(db_column='AI_VideoPath',  null=True, blank=True)
+    video_file       = models.FileField(
+        upload_to='lesson_videos/',
+        null=True, blank=True,
+        validators=[FileExtensionValidator(['mp4', 'webm', 'mov', 'avi'])],
+        help_text='فيديو تعليمي مرفوع يدوياً (MP4/WebM/MOV/AVI — بحد أقصى 500MB)'
+    )
+    video_title      = models.CharField(max_length=200, null=True, blank=True, help_text='عنوان الفيديو التعليمي')
     complexitylevel   = models.CharField(db_column='ComplexityLevel', max_length=10, choices=COMPLEXITY_CHOICES, default='Easy')
     createdat         = models.DateTimeField(db_column='CreatedAt', auto_now_add=True)
     status            = models.CharField(db_column='Status', max_length=10, choices=STATUS_CHOICES, default='Pending')

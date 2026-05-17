@@ -333,12 +333,95 @@ def teacher_dashboard(request):
         'my_subjects':      my_subjects,
         'my_classes':       my_classes,
         'student_count':    dynamic_students,
-        'total_lessons':    len(lessons_list),
         'published_count':  dynamic_published,
         'is_admin':         is_admin,
         'selected_subject': subject_id,
         'selected_class':   class_id,
     })
+
+@login_required
+def ai_video_tools(request):
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role     = getattr(request.user, 'userrole', None)
+
+    # فحص الصلاحية
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        messages.error(request, 'هذه الصفحة مخصصة للمعلمين فقط.')
+        return redirect('student:student_home')
+
+    teacher = Teacher.objects.filter(userid=request.user).first()
+    lessons = []
+    
+    if teacher:
+        lessons = list(
+            Lessoncontent.objects
+            .filter(teacherid=teacher)
+            .select_related('subjectid', 'subjectid__classid')
+            .order_by('-createdat')
+        )
+
+    return render(request, 'learning/ai_video_tools.html', {
+        'lessons': lessons
+    })
+
+@login_required
+@require_POST
+def upload_lesson_video(request):
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role     = getattr(request.user, 'userrole', None)
+
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'success': False, 'error': 'غير مصرح'}, status=403)
+
+    try:
+        lesson_id = request.POST.get('lesson_id')
+        video_file = request.FILES.get('video_file')
+        video_title = request.POST.get('video_title', '')
+        lesson_text = request.POST.get('lesson_text', '')
+        support_content = request.POST.get('support_content', '')
+
+        if not lesson_id:
+            return JsonResponse({'success': False, 'error': 'يجب اختيار الدرس'})
+        
+        if not video_file:
+            return JsonResponse({'success': False, 'error': 'يجب اختيار ملف الفيديو'})
+
+        lesson = Lessoncontent.objects.filter(lessonid=lesson_id).first()
+        if not lesson:
+            return JsonResponse({'success': False, 'error': 'الدرس غير موجود'})
+
+        # التحقق من أن المعلم هو مالك الدرس
+        teacher = Teacher.objects.filter(userid=request.user).first()
+        if lesson.teacherid != teacher:
+            return JsonResponse({'success': False, 'error': 'غير مصرح بتعديل هذا الدرس'})
+
+        # التحقق من حجم الملف (500MB)
+        max_size = 500 * 1024 * 1024  # 500MB
+        if video_file.size > max_size:
+            return JsonResponse({'success': False, 'error': 'حجم الملف يتجاوز الحد الأقصى (500MB)'})
+
+        # حذف الفيديو القديم إذا وجد
+        if lesson.video_file:
+            lesson.video_file.delete(save=False)
+
+        # حفظ الفيديو الجديد
+        lesson.video_file = video_file
+        if video_title:
+            lesson.video_title = video_title
+        
+        # تحديث النص إذا تم إدخاله
+        if lesson_text:
+            lesson.originaltext = lesson_text
+        
+        lesson.save()
+
+        logger.info(f'[Video Upload] Teacher {request.user.username} uploaded video for lesson {lesson_id}')
+
+        return JsonResponse({'success': True, 'message': 'تم رفع الفيديو بنجاح'})
+
+    except Exception as e:
+        logger.error(f'upload_lesson_video error: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 # ══════════════════════════════════════════════════════════════
 # إنشاء الدرس بالذكاء الاصطناعي
