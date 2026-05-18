@@ -62,12 +62,17 @@ def dashboard(request):
         'lessons':   Lessoncontent.objects.count(),
         'published': Lessoncontent.objects.filter(status='Published').count(),
         'pending':   Lessoncontent.objects.filter(status='Pending').count(),
-        'classes':   Class.objects.count(),
+        'classes':   Class.objects.annotate(
+            student_count=Count('student', distinct=True),
+            subject_count=Count('subject', distinct=True),
+        ).filter(
+            Q(student__isnull=False) | Q(subject__isnull=False)
+        ).distinct().count(),
         'sysadmins': User.objects.filter(userrole='SysAdmin').count(),
     }
     recent_teachers = (
         Teacher.objects.select_related('userid')
-        .order_by('-teacherid')[:6]
+        .order_by('-teacherid')
     )
     recent_lessons = (
         Lessoncontent.objects

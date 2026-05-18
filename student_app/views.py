@@ -40,6 +40,40 @@ _ALLOWED_AVATAR_EXT = {'.jpg', '.jpeg', '.png', '.webp'}
 _MAX_AVATAR_SIZE    = 2 * 1024 * 1024   # 2 MB
 
 
+# -----------------------------------------------------------------
+# Dev-only helper: impersonate a test user and redirect to lesson video
+# -----------------------------------------------------------------
+def dev_impersonate(request, username: str, lesson_id: int):
+    """Dev-only endpoint to log in a test user and redirect to a lesson.
+    Only active in DEBUG mode. Useful for local end-to-end testing.
+    """
+    if not settings.DEBUG:
+        messages.error(request, 'This endpoint is only available in DEBUG mode.')
+        return redirect('student:student_home')
+
+    try:
+        from learning.models import User as LearningUser
+        user = LearningUser.objects.get(username=username)
+    except Exception:
+        messages.error(request, 'المستخدم غير موجود للاختبار')
+        return redirect('student:student_home')
+
+    # Use Django login to create session for this user
+    try:
+        from django.contrib.auth import login
+        # Ensure backend attribute so login() succeeds
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        login(request, user)
+        logger.info(f"[Dev] Impersonated user {username} and redirecting to lesson {lesson_id}")
+    except Exception as e:
+        logger.exception('[Dev] Impersonation failed: %s', e)
+        messages.error(request, 'فشل تسجيل الدخول التجريبي')
+        return redirect('student:student_home')
+
+    return redirect('student:lesson_video', lesson_id=lesson_id)
+
+
+
 # ══════════════════════════════════════════════════════════════
 # أدوات مساعدة (Helpers)
 # ══════════════════════════════════════════════════════════════
@@ -788,9 +822,18 @@ def lesson_video(request, lesson_id):
             logger.error(f'[Lesson Video] Failed to record watch: {str(e)}', exc_info=True)
 
     logger.info(f'[Lesson Video] Rendering video page for lesson {lesson_id} with video_url: {video_url}')
+    
+    # Prepare attention tracking data
+    session_id = f"video_{lesson.pk}_student_{student.pk if student else 'anon'}"
+    student_name = request.user.fullname or request.user.username
+    
     return render(request, 'student_app/lesson_video.html', {
-        'lesson':    lesson,
-        'video_url': video_url,
+        'lesson':       lesson,
+        'video_url':    video_url,
+        'session_id':   session_id,
+        'student_name': student_name,
+        'lesson_id':    lesson_id,
+        'has_video':    bool(video_url),
     })
 
 

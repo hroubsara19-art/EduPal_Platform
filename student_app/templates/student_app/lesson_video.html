@@ -213,7 +213,11 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 {% endblock %}
 
 {% block content %}
-<div class="lesson-video-wrap" dir="rtl" lang="ar">
+<div class="lesson-video-wrap" dir="rtl" lang="ar"
+     data-lesson-id="{{ lesson_id|default:0 }}"
+     data-session-id="{{ session_id|default:'' }}"
+     data-student-name="{{ student_name|default:'طالب' }}"
+     data-csrf-token="{{ csrf_token|default:'' }}">
   <!-- ══ Attention Tracking System ════════════════════════════════ -->
   <div class="attention-tracking-overlay" id="attentionCameraOverlay" style="display: none;">
     <video id="attentionCamera" class="attention-camera" playsinline></video>
@@ -309,499 +313,678 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 
 <script>
 // ══════════════════════════════════════════════════════════════
-// Attention Tracking System - Foundation & State Management
+// Attention Tracking System - Real WebSocket Implementation
 // ══════════════════════════════════════════════════════════════
 
-const AttentionTracker = {
-  // ── State ─────────────────────────────────────────────────────
-  isEnabled: false,
-  isTracking: false,
-  cameraActive: false,
-  videoPlaying: false,
-  attentionState: 'attentive',
-  distractionStartTime: null,
-  distractionDuration: 0,
-  shortAlertShown: false,
-  longAlertActive: false,
-  videoStream: null,
-  studentName: '{{ request.user.fullname }}' || 'طالب',
-  alertAudioPlaying: false,
-  trackingCheckInterval: null,
-  distractionCheckInterval: null,
-  cameraPermissionAsked: false,
-  wasTrackingBeforePause: false,
-  simulationStartTime: null,
+// Global variables
+var ws = null;
+var _mediaStream = null;
+var _frameInterval = null;
+var trackingActive = false;
+var _savedWsUrl = '';
 
-  // ── Configuration ─────────────────────────────────────────────
-  config: {
-    shortDistraction: 3000,    // 3 seconds - text alert only
-    longDistraction: 5000,     // 5 seconds - text + audio + pause
-    attentionCheckRate: 500,   // Check every 500ms
-    attentionConfirmDelay: 1000, // 1 second before resuming video
-    cameraDimensions: { width: 180, height: 180 }
-  },
-
-  init: function() {
-    console.log('[AttentionTracker] Initializing...');
-    this.setupEventListeners();
-    this.setupVideoControls();
-    this.autoRequestCameraOnFirstPlay();
-  },
-
-  setupEventListeners: function() {
-    const video = document.querySelector('.video-player');
-    if (!video) return;
-
-    video.addEventListener('play', () => this.onVideoPlay());
-    video.addEventListener('pause', () => this.onVideoPause());
-    video.addEventListener('ended', () => this.onVideoEnded());
-  },
-
-  autoRequestCameraOnFirstPlay: function() {
-    const video = document.querySelector('.video-player');
-    if (!video) return;
-
-    const requestCameraOnce = () => {
-      if (!this.cameraActive && !this.cameraPermissionAsked) {
-        this.cameraPermissionAsked = true;
-        console.log('[AttentionTracker] Auto-requesting camera');
-        this.requestCameraPermission();
-      }
-      video.removeEventListener('play', requestCameraOnce);
-    };
-
-    video.addEventListener('play', requestCameraOnce, { once: true });
-  },
-
-  setupVideoControls: function() {
-    const video = document.querySelector('.video-player');
-    if (!video) return;
-
-    // Store original play method
-    const originalPlay = video.play.bind(video);
-    video.play = function() {
-      if (AttentionTracker.isTracking && AttentionTracker.attentionState === 'distracted') {
-        console.log('[AttentionTracker] Cannot play - student distracted');
-        return Promise.reject('Student distracted');
-      }
-      return originalPlay();
-    };
-  },
-
-  // ── Camera & Tracking Control ──────────────────────────────────
-  toggleAttentionTracking: function() {
-    if (!this.isEnabled) {
-      this.enableTracking();
-    } else {
-      this.disableTracking();
-    }
-  },
-
-  enableTracking: async function() {
-    console.log('[AttentionTracker] Enabling tracking...');
-    try {
-      // Request camera access
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
-      });
-
-      this.videoStream = stream;
-      this.cameraActive = true;
-      this.isEnabled = true;
-      this.isTracking = true;
-
-      // Attach stream to video element
-      const cameraVideo = document.getElementById('attentionCamera');
-      if (cameraVideo) {
-        cameraVideo.srcObject = stream;
-        document.getElementById('attentionCameraOverlay').style.display = 'block';
-      }
-
-      this.updateUI();
-      this.startAttentionMonitoring();
-      console.log('[AttentionTracker] Tracking enabled');
-    } catch (error) {
-      console.error('[AttentionTracker] Camera access denied:', error);
-      alert('يرجى السماح بالوصول للكاميرا لتفعيل نظام تتبع الانتباه');
-      this.isEnabled = false;
-      this.updateUI();
-    }
-  },
-
-  requestCameraPermission: async function() {
-    console.log('[AttentionTracker] Requesting camera');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
-      });
-      this.setupCameraStream(stream);
-    } catch (error) {
-      console.warn('[AttentionTracker] Camera denied:', error);
-    }
-  },
-
-  setupCameraStream: function(stream) {
-    this.videoStream = stream;
-    this.cameraActive = true;
-    this.isEnabled = true;
-
-    const cameraVideo = document.getElementById('attentionCamera');
-    if (cameraVideo) {
-      cameraVideo.srcObject = stream;
-      document.getElementById('attentionCameraOverlay').style.display = 'block';
-    }
-
-    this.updateUI();
-    console.log('[AttentionTracker] Camera ready');
-  },
-
-  enableTracking: async function() {
-    console.log('[AttentionTracker] Enabling tracking');
-    if (this.cameraActive) {
-      this.isTracking = true;
-      if (this.videoPlaying) {
-        this.startAttentionMonitoring();
-      }
-      this.updateUI();
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: this.config.cameraDimensions, height: this.config.cameraDimensions }
-      });
-      this.setupCameraStream(stream);
-      this.isTracking = true;
-      if (this.videoPlaying) {
-        this.startAttentionMonitoring();
-      }
-    } catch (error) {
-      console.error('[AttentionTracker] Camera error:', error);
-      alert('يرجى السماح بالوصول للكاميرا');
-      this.isEnabled = false;
-      this.updateUI();
-    }
-  },
-
-  disableTracking: function() {
-    console.log('[AttentionTracker] Disabling tracking');
-    this.isTracking = false;
-    this.stopAttentionMonitoring();
-    this.clearAlerts();
-
-    if (this.videoStream) {
-      this.videoStream.getTracks().forEach(track => track.stop());
-      this.videoStream = null;
-    }
-
-    this.cameraActive = false;
-    this.isEnabled = false;
-    document.getElementById('attentionCameraOverlay').style.display = 'none';
-    this.updateUI();
-  },
-
-  onVideoPlay: function() {
-    console.log('[AttentionTracker] Video playing');
-    this.videoPlaying = true;
-    
-    if (this.wasTrackingBeforePause && this.cameraActive && !this.isTracking) {
-      console.log('[AttentionTracker] Resuming tracking');
-      this.isTracking = true;
-      this.resetDistractionState();
-      this.startAttentionMonitoring();
-    } else if (this.isTracking) {
-      this.startAttentionMonitoring();
-    }
-  },
-
-  onVideoPause: function() {
-    console.log('[AttentionTracker] Video paused');
-    this.videoPlaying = false;
-    
-    if (this.isTracking) {
-      this.wasTrackingBeforePause = true;
-    }
-    
-    this.stopAttentionMonitoring();
-    this.clearAlerts();
-  },
-
-  onVideoEnded: function() {
-    console.log('[AttentionTracker] Video ended');
-    this.videoPlaying = false;
-    this.wasTrackingBeforePause = false;
-    this.stopAttentionMonitoring();
-    this.clearAlerts();
-    this.disableTracking();
-  },
-
-  resetDistractionState: function() {
-    this.attentionState = 'attentive';
-    this.distractionStartTime = null;
-    this.distractionDuration = 0;
-    this.shortAlertShown = false;
-    this.longAlertActive = false;
-  },
-
-  // ── Attention Monitoring ──────────────────────────────────────
-  startAttentionMonitoring: function() {
-    if (this.trackingCheckInterval) return;
-
-    console.log('[AttentionTracker] Starting attention monitoring');
-    this.trackingCheckInterval = setInterval(() => {
-      this.checkAttentionState();
-      this.updateDistraction();
-    }, this.config.attentionCheckRate);
-  },
-
-  stopAttentionMonitoring: function() {
-    if (this.trackingCheckInterval) {
-      clearInterval(this.trackingCheckInterval);
-      this.trackingCheckInterval = null;
-    }
-    console.log('[AttentionTracker] Stopped attention monitoring');
-  },
-
-  checkAttentionState: function() {
-    const newState = this.simulateAttentionDetection();
-    
-    if (newState !== this.attentionState) {
-      console.log('[AttentionTracker] Attention state:', newState);
-      this.attentionState = newState;
-      this.updateUI();
-
-      if (newState === 'attentive') {
-        this.onAttentiveDetected();
-      } else if (newState === 'distracted') {
-        this.distractionStartTime = Date.now();
-      }
-    }
-  },
-
-  simulateAttentionDetection: function() {
-    if (!this.simulationStartTime) {
-      this.simulationStartTime = Date.now();
-    }
-    
-    const elapsed = (Date.now() - this.simulationStartTime) / 1000;
-    const cycle = (elapsed % 11);
-    return cycle < 8 ? 'attentive' : 'distracted';
-  },
-
-  captureFrame: function() {
-    const video = document.getElementById('attentionCamera');
-    if (!video) return null;
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    return canvas;
-  },
-
-  updateDistraction: function() {
-    if (this.attentionState === 'distracted' && this.distractionStartTime) {
-      this.distractionDuration = Date.now() - this.distractionStartTime;
-
-      // Short distraction (3 seconds)
-      if (this.distractionDuration >= this.config.shortDistraction && !this.shortAlertShown) {
-        this.showShortAlert();
-        this.shortAlertShown = true;
-      }
-
-      // Long distraction (5 seconds)
-      if (this.distractionDuration >= this.config.longDistraction && !this.longAlertActive) {
-        this.showLongAlert();
-        this.longAlertActive = true;
-      }
-    }
-  },
-
-  // ── Alert Management ──────────────────────────────────────────
-  showShortAlert: function() {
-    console.log('[AttentionTracker] Short alert - Gentle reminder');
-    const alerts = [
-      `${this.studentName}، تابع معنا!`,
-      `${this.studentName}، التركيز قليلاً`,
-      `${this.studentName}، عودة للفيديو`
-    ];
-    const alertText = alerts[Math.floor(Math.random() * alerts.length)];
-    
-    const alertElement = document.getElementById('attentionAlert');
-    const textElement = document.getElementById('attentionAlertText');
-    const icon = alertElement.querySelector('.attention-alert-icon');
-    
-    if (icon) {
-      icon.innerHTML = '<i class="fas fa-lightbulb"></i>';
-    }
-    
-    textElement.textContent = alertText;
-    alertElement.classList.add('show');
-
-    setTimeout(() => {
-      if (this.attentionState === 'distracted') return;
-      alertElement.classList.remove('show');
-    }, 2000);
-  },
-
-  showLongAlert: function() {
-    console.log('[AttentionTracker] Long alert - Video paused');
-    const video = document.querySelector('.video-player');
-    if (video && !video.paused) {
-      video.pause();
-    }
-
-    const alertElement = document.getElementById('attentionAlert');
-    const textElement = document.getElementById('attentionAlertText');
-    const icon = alertElement.querySelector('.attention-alert-icon');
-    
-    if (icon) {
-      icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
-    }
-    
-    const alertText = `${this.studentName}\nالفيديو موقوف - يرجى العودة للتركيز`;
-    textElement.textContent = alertText;
-    alertElement.classList.add('show');
-
-    this.playAudioAlert(this.studentName);
-  },
-
-  playAudioAlert: function(studentName) {
-    console.log('[AttentionTracker] Playing audio alert');
-    
-    if ('speechSynthesis' in window) {
-      speechSynthesis.cancel();
-      
-      const messages = [
-        `${studentName}, عودة معنا من فضلك`,
-        `${studentName}, الفيديو ينتظرك`,
-        `${studentName}, ركز قليلاً معنا`
-      ];
-      const message = messages[Math.floor(Math.random() * messages.length)];
-      
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.lang = 'ar';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.1;
-      utterance.volume = 0.8;
-      
-      this.muteVideoAudio();
-      this.alertAudioPlaying = true;
-
-      utterance.onend = () => {
-        console.log('[AttentionTracker] Audio finished');
-        this.alertAudioPlaying = false;
-        this.unmuteVideoAudio();
-      };
-
-      utterance.onerror = (error) => {
-        console.error('[AttentionTracker] Speech error:', error);
-        this.alertAudioPlaying = false;
-        this.unmuteVideoAudio();
-      };
-
-      speechSynthesis.speak(utterance);
-    }
-  },
-
-  onAttentiveDetected: function() {
-    console.log('[AttentionTracker] Attentive detected - resuming');
-    
-    this.distractionStartTime = null;
-    this.distractionDuration = 0;
-    this.shortAlertShown = false;
-
-    if (this.longAlertActive) {
-      this.longAlertActive = false;
-      
-      if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-      }
-      
-      setTimeout(() => {
-        this.clearAlerts();
-        this.resumeVideoAfterAttention();
-      }, this.config.attentionConfirmDelay);
-    } else {
-      this.clearAlerts();
-    }
-
-    this.updateUI();
-  },
-
-  resumeVideoAfterAttention: function() {
-    console.log('[AttentionTracker] Resuming video after attention confirmed');
-    const video = document.querySelector('.video-player');
-    if (video && video.paused) {
-      video.play().catch(err => console.error('[AttentionTracker] Resume error:', err));
-    }
-  },
-
-  clearAlerts: function() {
-    const alertElement = document.getElementById('attentionAlert');
-    if (alertElement) {
-      alertElement.classList.remove('show');
-      const icon = alertElement.querySelector('.attention-alert-icon');
-      if (icon) {
-        icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-      }
-    }
-    
-    if ('speechSynthesis' in window) {
-      speechSynthesis.cancel();
-    }
-    this.alertAudioPlaying = false;
-    this.unmuteVideoAudio();
-  },
-
-  muteVideoAudio: function() {
-    const video = document.querySelector('.video-player');
-    if (video) video.volume = 0;
-  },
-
-  unmuteVideoAudio: function() {
-    const video = document.querySelector('.video-player');
-    if (video) video.volume = 1;
-  },
-
-  // ── UI Updates ─────────────────────────────────────────────────
-  updateUI: function() {
-    const toggleBtn = document.getElementById('attentionToggleBtn');
-    const statusElement = document.getElementById('attentionStatus');
-    const statusIndicator = document.getElementById('statusIndicator');
-    const statusText = document.getElementById('statusText');
-
-    // Update toggle button
-    if (this.isEnabled) {
-      toggleBtn.classList.remove('disabled');
-      toggleBtn.innerHTML = '<i class="fas fa-camera-slash"></i>';
-      statusElement.style.display = 'flex';
-    } else {
-      toggleBtn.classList.add('disabled');
-      toggleBtn.innerHTML = '<i class="fas fa-camera"></i>';
-      statusElement.style.display = 'none';
-      return;
-    }
-
-    // Update status indicator
-    if (this.attentionState === 'attentive') {
-      statusIndicator.className = 'status-indicator attentive';
-      statusText.textContent = 'متركز';
-    } else {
-      statusIndicator.className = 'status-indicator distracted';
-      statusText.textContent = `مشتت (${Math.round(this.distractionDuration / 1000)}s)`;
-    }
-  }
+// Attention state tracking
+var _attentionState = {
+  distracted: false,
+  startTime: null,
+  level: 'none',
+  lastAlertLevel: null,
+  pausedByDistraction: false,
+  consecutiveDistractionCount: 0,
+  maxConsecutiveDistractions: 5
 };
 
-function toggleAttentionTracking() {
-  AttentionTracker.toggleAttentionTracking();
+// Video state tracking
+var _videoState = {
+  pausedBySystem: false,
+  pausedByUser: false,
+  wasPlayingBeforeDistraction: false
+};
+
+// Alert state tracking
+var _alertState = {
+  shortAlertShown: false,
+  longAlertActive: false,
+  audioPlaying: false
+};
+
+// Configuration
+var _config = {
+  shortDistraction: 3000,    // 3 seconds - text alert with student name
+  longDistraction: 5000,     // 5 seconds - text + audio + pause with student name
+  frameSendRate: 300,        // Send frames every 300ms
+  cameraDimensions: { width: 320, height: 240 }
+};
+
+// Template variables - read from data attributes
+var wrapElement = document.querySelector('.lesson-video-wrap');
+var LESSON_ID = parseInt(wrapElement ? wrapElement.dataset.lessonId || '0' : '0', 10);
+var SESSION_ID = wrapElement ? wrapElement.dataset.sessionId || '' : '';
+var STUDENT_NAME = wrapElement ? wrapElement.dataset.studentName || 'طالب' : 'طالب';
+var CSRF_TOKEN = wrapElement ? wrapElement.dataset.csrfToken || '' : '';
+
+// ══════════════════════════════════════════════════════════════
+// Voice Management for Arabic TTS
+// ══════════════════════════════════════════════════════════════
+
+var _voiceState = {
+  selectedVoice: null,
+  voicesLoaded: false
+};
+
+function initVoice() {
+  if (!('speechSynthesis' in window)) {
+    console.warn('[Voice] Speech synthesis not supported');
+    return;
+  }
+  
+  loadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[AttentionTracker] Initializing system');
-  AttentionTracker.init();
+function loadVoices() {
+  var voices = speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    _voiceState.voicesLoaded = true;
+    var arabicVoice = voices.find(function(v) { return v.lang.startsWith('ar'); });
+    if (arabicVoice) {
+      _voiceState.selectedVoice = arabicVoice;
+      console.log('[Voice] Arabic voice loaded:', arabicVoice.name);
+    }
+  }
+}
+
+function cancelAllAlerts() {
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel();
+  }
+  var audioEl = document.getElementById('attentionAlertSound');
+  if (audioEl) {
+    try { audioEl.pause(); audioEl.currentTime = 0; } catch(e) {}
+  }
+}
+
+function speakAlert(text, onDone) {
+  // Stop any existing alerts first
+  cancelAllAlerts();
+
+  // Try server-side TTS first (returns an audio_url), fallback to speechSynthesis
+  try {
+    fetch("{% url 'student:tts_alert' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ text: text })
+    })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject('TTS request failed'); })
+    .then(function(d) {
+      if (d && d.ok && d.audio_url) {
+        var audioEl = document.getElementById('attentionAlertSound');
+        if (!audioEl) {
+          audioEl = document.createElement('audio');
+          audioEl.id = 'attentionAlertSound'; audioEl.preload = 'auto';
+          document.body.appendChild(audioEl);
+        }
+        audioEl.src = d.audio_url;
+        _alertState.audioPlaying = true;
+        audioEl.onended = function() { _alertState.audioPlaying = false; if (onDone) onDone(); };
+        audioEl.onerror = function(e) { console.error('[Voice] Audio play error', e); _alertState.audioPlaying = false; speakViaSpeechSynthesis(text, onDone); };
+        audioEl.play().catch(function(e) { console.warn('[Voice] Audio play prevented', e); _alertState.audioPlaying = false; speakViaSpeechSynthesis(text, onDone); });
+        return;
+      }
+      // Fallback
+      speakViaSpeechSynthesis(text, onDone);
+    })
+    .catch(function(e) {
+      console.warn('[Voice] Server TTS failed, falling back to speechSynthesis', e);
+      speakViaSpeechSynthesis(text, onDone);
+    });
+  } catch (e) {
+    console.warn('[Voice] TTS fetch error', e);
+    speakViaSpeechSynthesis(text, onDone);
+  }
+
+  function speakViaSpeechSynthesis(txt, cb) {
+    if (!('speechSynthesis' in window)) { if (cb) cb(); return; }
+    var u = new SpeechSynthesisUtterance(txt);
+    u.lang = 'ar-SA'; u.rate = 0.9; u.pitch = 1.0; u.volume = 0.8;
+    if (_voiceState.selectedVoice) u.voice = _voiceState.selectedVoice;
+    u.onend = function() { if (cb) cb(); };
+    u.onerror = function(e) { console.error('[Voice] Speech error:', e); if (cb) cb(); };
+    speechSynthesis.speak(u);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Video Event Handlers
+// ══════════════════════════════════════════════════════════════
+
+var videoElement = null;
+
+function setupVideoEvents() {
+  videoElement = document.querySelector('.video-player');
+  if (!videoElement) return;
+  
+  videoElement.addEventListener('play', onVideoPlay);
+  videoElement.addEventListener('pause', onVideoPause);
+  videoElement.addEventListener('ended', onVideoEnded);
+}
+
+function onVideoPlay() {
+  console.log('[Video] Video playing');
+  _videoState.wasPlayingBeforeDistraction = true;
+  _videoState.pausedByUser = false;
+  
+  // Start tracking only when video plays
+  if (!trackingActive) {
+    startTracking();
+  }
+}
+
+function onVideoPause() {
+  console.log('[Video] Video paused');
+  
+  // If paused by system (distraction), don't stop tracking
+  if (_videoState.pausedBySystem) {
+    console.log('[Video] ℹ Paused by system (distraction) - tracking continues');
+    return;
+  }
+  
+  // User manually paused the video
+  console.log('[Video] ❚❚ User paused video manually - stopping tracking');
+  _videoState.pausedByUser = true;
+  _videoState.wasPlayingBeforeDistraction = false;
+  stopTracking();
+}
+
+function onVideoEnded() {
+  console.log('[Video] Video ended');
+  _videoState.wasPlayingBeforeDistraction = false;
+  stopTracking();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Attention Tracking Functions
+// ══════════════════════════════════════════════════════════════
+
+function startTracking() {
+  console.log('[Attention] Starting tracking');
+  
+  fetch("{% url 'student:attention_start' %}", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN
+    },
+    body: JSON.stringify({
+      lesson_id: LESSON_ID
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok && d.ws_url) {
+      _savedWsUrl = d.ws_url;
+      trackingActive = true;
+      connectWebSocket(d.ws_url);
+      updateStatus('attentive', 'التتبع نشط ✅');
+    } else {
+      console.error('[Attention] Failed to start tracking:', d);
+      showAlert('فشل بدء تتبع الانتباه');
+    }
+  })
+  .catch(function(e) {
+    console.error('[Attention] Start tracking error:', e);
+    showAlert('تعذر الاتصال بخادم تتبع الانتباه');
+  });
+}
+
+function stopTracking() {
+  console.log('[Attention] 🛑 Stopping tracking');
+  trackingActive = false;
+  
+  // Stop sending frames
+  stopFrameSending();
+  
+  // Close WebSocket
+  if (ws) {
+    ws.close();
+    ws = null;
+    console.log('[Attention] WebSocket closed');
+  }
+  
+  // Stop camera stream
+  if (_mediaStream) {
+    _mediaStream.getTracks().forEach(function(t) { t.stop(); });
+    _mediaStream = null;
+    console.log('[Attention] Camera stream stopped');
+  }
+  
+  // Stop all audio alerts
+  cancelAllAlerts();
+  
+  // Hide all visual alerts
+  clearAlerts();
+  
+  // Reset state
+  resetAttentionState();
+  
+  // Hide UI
+  var statusElement = document.getElementById('attentionStatus');
+  if (statusElement) {
+    statusElement.style.display = 'none';
+  }
+  
+  // Notify backend to stop the session (best-effort)
+  try {
+    fetch("{% url 'student:attention_stop' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ session_id: SESSION_ID })
+    }).catch(function(e){ console.warn('[Attention] stop POST failed', e); });
+  } catch (e) { console.warn('[Attention] stop POST exception', e); }
+
+  console.log('[Attention] Tracking stopped and cleaned up');
+}
+
+function connectWebSocket(wsUrl) {
+  var normalized = normalizeWsUrl(wsUrl);
+  if (!normalized) {
+    console.error('[Attention] Invalid ws_url:', wsUrl);
+    return;
+  }
+  
+  ws = new WebSocket(normalized);
+  
+  ws.onopen = function() {
+    console.log('[Attention] WebSocket connected');
+    showAlert('تم الاتصال بخادم تتبع الانتباه');
+    startFrameSending();
+  };
+  
+  ws.onerror = function(err) {
+    console.error('[Attention] WebSocket error:', err);
+    showAlert('حدث خطأ في اتصال WebSocket');
+  };
+  
+  ws.onmessage = function(e) {
+    var s = JSON.parse(e.data);
+    if (s.error || s.type === 'pong') return;
+    
+    processAttentionState(s);
+  };
+  
+  ws.onclose = function() {
+    console.log('[Attention] WebSocket closed');
+    stopFrameSending();
+    
+    if (trackingActive) {
+      console.log('[Attention] Reconnecting in 3 seconds...');
+      setTimeout(function() {
+        if (trackingActive) connectWebSocket(wsUrl);
+      }, 3000);
+    }
+  };
+}
+
+function normalizeWsUrl(wsUrl) {
+  if (!wsUrl || typeof wsUrl !== 'string') return '';
+  
+  if (wsUrl.indexOf('ws://') === 0 || wsUrl.indexOf('wss://') === 0) {
+    if (location.protocol === 'https:' && wsUrl.indexOf('ws://') === 0) {
+      return 'wss://' + wsUrl.slice(5);
+    }
+    return wsUrl;
+  }
+  
+  if (wsUrl.indexOf('//') === 0) {
+    return (location.protocol === 'https:' ? 'wss:' : 'ws:') + wsUrl;
+  }
+  
+  if (wsUrl.indexOf('/') === 0) {
+    return (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.hostname + ':5050' + wsUrl;
+  }
+  
+  return wsUrl;
+}
+
+function startFrameSending() {
+  if (_frameInterval) clearInterval(_frameInterval);
+  
+  var canvas = document.getElementById('_cam-canvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = '_cam-canvas';
+    canvas.style.display = 'none';
+    canvas.width = 320;
+    canvas.height = 240;
+    document.body.appendChild(canvas);
+  }
+  
+  var ctx = canvas.getContext('2d');
+  var vid = document.getElementById('_cam-feed');
+  
+  _frameInterval = setInterval(function() {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !vid || !_mediaStream) return;
+    
+    try {
+      ctx.drawImage(vid, 0, 0, 320, 240);
+      var b64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+      ws.send(JSON.stringify({ type: 'frame', data: b64 }));
+    } catch(e) {
+      console.error('[Attention] Frame send error:', e);
+    }
+  }, _config.frameSendRate);
+}
+
+function stopFrameSending() {
+  if (_frameInterval) {
+    clearInterval(_frameInterval);
+    _frameInterval = null;
+  }
+}
+
+function requestCameraAndStart() {
+  var constraints = {
+    video: {
+      width: { ideal: _config.cameraDimensions.width },
+      height: { ideal: _config.cameraDimensions.height },
+      facingMode: 'user'
+    },
+    audio: false
+  };
+  
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(onStream)
+      .catch(onCameraError);
+  } else {
+    onCameraError({ name: 'NotSupported' });
+  }
+}
+
+function onStream(stream) {
+  _mediaStream = stream;
+  
+  var vid = document.getElementById('_cam-feed');
+  if (!vid) {
+    vid = document.createElement('video');
+    vid.id = '_cam-feed';
+    vid.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;top:0;left:0;';
+    vid.autoplay = true;
+    vid.playsInline = true;
+    vid.muted = true;
+    document.body.appendChild(vid);
+  }
+  
+  vid.srcObject = stream;
+  vid.play().catch(function() {});
+  
+  document.getElementById('attentionCameraOverlay').style.display = 'block';
+  
+}
+
+function onCameraError(err) {
+  console.error('[Attention] Camera error:', err);
+  showAlert('يرجى السماح بالوصول للكاميرا');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Attention State Processing
+// ══════════════════════════════════════════════════════════════
+
+function processAttentionState(s) {
+  var now = Date.now();
+  var attentive = !!s.is_attentive;
+  
+  if (!attentive) {
+    // Student is distracted
+    if (!_attentionState.distracted) {
+      // First frame of distraction
+      _attentionState.distracted = true;
+      _attentionState.startTime = now;
+      _attentionState.lastAlertLevel = null;
+      console.log('[Attention] 😴 Distraction detected');
+    }
+    
+    // Calculate duration of current distraction
+    var duration = (now - (_attentionState.startTime || now)) / 1000;
+    var newLevel = duration >= 5 ? 'medium' : duration >= 3 ? 'short' : 'none';
+    _attentionState.level = newLevel;
+    
+    // Handle alert based on duration
+    handleDistractionLevel(_attentionState.level, duration);
+    
+    // Update status bar
+    updateStatus('distracted', 'مشتت (' + Math.round(duration) + 's)');
+  } else {
+    // Student is attentive
+    if (_attentionState.distracted) {
+      // Transition from distracted to attentive
+      console.log('[Attention] 👁️ Attention regained');
+      onAttentiveDetected();
+    }
+    
+    _attentionState.distracted = false;
+    _attentionState.level = 'none';
+    _attentionState.startTime = null;
+    _attentionState.lastAlertLevel = null;
+    
+    // Update status bar
+    updateStatus('attentive', 'متركز ✅');
+  }
+}
+
+function handleDistractionLevel(level, duration) {
+  if (_attentionState.lastAlertLevel === level) return;
+  _attentionState.lastAlertLevel = level;
+  
+  // 3 seconds - short alert (text only, no pause)
+  if (level === 'short' && duration >= 3 && duration < 5) {
+    showShortAlert();
+  } 
+  // 5+ seconds - long alert (text + pause + audio)
+  else if (level === 'medium' && duration >= 5) {
+    showLongAlert();
+  }
+}
+
+function showShortAlert() {
+  console.log('[Attention] ✅ Short alert triggered (3 seconds)');
+  
+  var messages = [
+    STUDENT_NAME + '، يرجى التركيز',
+    STUDENT_NAME + '، انتبه للفيديو',
+    STUDENT_NAME + '، عودة للفيديو'
+  ];
+  var msg = messages[Math.floor(Math.random() * messages.length)];
+  
+  var alertElement = document.getElementById('attentionAlert');
+  var textElement = document.getElementById('attentionAlertText');
+  var iconElement = alertElement ? alertElement.querySelector('.attention-alert-icon') : null;
+  
+  if (alertElement && textElement && iconElement) {
+    // Update icon to lightbulb (gentle alert)
+    iconElement.innerHTML = '<i class="fas fa-lightbulb"></i>';
+    textElement.textContent = msg;
+    alertElement.classList.add('show');
+    
+    console.log('[Attention] Short alert shown: "' + msg + '"');
+    
+    // Auto-hide after 2 seconds if still distracted
+      setTimeout(function() {
+        // Only hide if attention regained or the distraction level changed
+        if (!_attentionState.distracted || _attentionState.level !== 'short') {
+          alertElement.classList.remove('show');
+        }
+      }, 2000);
+  }
+}
+
+function showLongAlert() {
+  console.log('[Attention] 🔴 Long alert triggered (5 seconds)');
+  
+  // Pause video
+  if (videoElement && !videoElement.paused) {
+    _videoState.pausedBySystem = true;
+    videoElement.pause();
+    console.log('[Attention] Video paused due to 5+ second distraction');
+  }
+  
+  // Show persistent text alert
+  var alertText = STUDENT_NAME + '\nالفيديو موقوف - يرجى العودة للتركيز';
+  
+  var alertElement = document.getElementById('attentionAlert');
+  var textElement = document.getElementById('attentionAlertText');
+  var iconElement = alertElement ? alertElement.querySelector('.attention-alert-icon') : null;
+  
+  if (alertElement && textElement && iconElement) {
+    // Update icon to red circle (serious alert)
+    iconElement.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+    textElement.textContent = alertText;
+    alertElement.classList.add('show');
+    
+    console.log('[Attention] Long alert shown: "' + alertText + '"');
+    
+    // Mark alert as active
+    _alertState.longAlertActive = true;
+  }
+  
+  // Play audio alert
+  var audioMsg = STUDENT_NAME + '، يرجى العودة للتركيز';
+  console.log('[Attention] Playing audio alert: "' + audioMsg + '"');
+  speakAlert(audioMsg, function() {
+    console.log('[Attention] Audio alert finished');
+    _alertState.audioPlaying = false;
+  });
+}
+
+function onAttentiveDetected() {
+  console.log('[Attention] ✅ Student is attentive - stopping alerts');
+  
+  // Stop audio alert immediately
+  cancelAllAlerts();
+  console.log('[Attention] Audio alerts cancelled');
+  
+  // Hide visual alerts
+  var alertElement = document.getElementById('attentionAlert');
+  if (alertElement) {
+    alertElement.classList.remove('show');
+    console.log('[Attention] Visual alerts hidden');
+  }
+  
+  // Reset alert flags
+  _alertState.longAlertActive = false;
+  _alertState.shortAlertShown = false;
+  _alertState.audioPlaying = false;
+  
+  // Auto-resume video if paused by system
+  if (videoElement && videoElement.paused && _videoState.pausedBySystem) {
+    console.log('[Attention] Resuming video after focus returned');
+    _videoState.pausedBySystem = false;
+    _videoState.wasPlayingBeforeDistraction = true;
+    
+    videoElement.play().catch(function(e) {
+      console.error('[Attention] Error resuming video:', e);
+    });
+  }
+  
+  // Reset distraction tracking
+  resetAttentionState();
+  
+  console.log('[Attention] 🔄 Ready for new attention/distraction cycle');
+}
+
+function resetAttentionState() {
+  _attentionState.distracted = false;
+  _attentionState.startTime = null;
+  _attentionState.level = 'none';
+  _attentionState.lastAlertLevel = null;
+  _attentionState.pausedByDistraction = false;
+}
+
+function clearAlerts() {
+  var alertElement = document.getElementById('attentionAlert');
+  if (alertElement) {
+    alertElement.classList.remove('show');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI Updates
+// ══════════════════════════════════════════════════════════════
+
+function updateStatus(state, text) {
+  var statusElement = document.getElementById('attentionStatus');
+  var statusIndicator = document.getElementById('statusIndicator');
+  var statusText = document.getElementById('statusText');
+  
+  if (!statusElement || !statusIndicator || !statusText) return;
+  
+  statusElement.style.display = 'flex';
+  statusText.textContent = text;
+  
+  if (state === 'attentive') {
+    statusIndicator.className = 'status-indicator attentive';
+  } else if (state === 'distracted') {
+    statusIndicator.className = 'status-indicator distracted';
+  } else {
+    statusIndicator.className = 'status-indicator';
+  }
+}
+
+function toggleAttentionTracking() {
+  var btn = document.getElementById('attentionToggleBtn');
+  if (trackingActive) {
+    stopTracking();
+    if (btn) btn.classList.remove('active');
+  } else {
+    // Ensure camera available then start tracking
+    if (!_mediaStream) {
+      requestCameraAndStart();
+    } else {
+      startTracking();
+    }
+    if (btn) btn.classList.add('active');
+  }
+}
+
+function showAlert(msg) {
+  var toast = document.getElementById('alert-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'alert-toast';
+    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+      'background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;padding:12px 24px;' +
+      'border-radius:12px;font-weight:700;z-index:10000;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.2);';
+    document.body.appendChild(toast);
+  }
+  
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  
+  setTimeout(function() {
+    toast.style.display = 'none';
+  }, 5000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Initialization
+// ══════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('[Attention] Initializing system');
+  
+  initVoice();
+  setupVideoEvents();
+  
+  // Request camera permission
+  requestCameraAndStart();
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+  stopTracking();
 });
 </script>
 {% endblock %}

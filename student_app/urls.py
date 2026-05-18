@@ -20,6 +20,9 @@ urlpatterns = [
     path('lesson/video/<int:lesson_id>/',   views.lesson_video,       name='lesson_video'),
     path('lesson/vr/<int:lesson_id>/',      views.lesson_vr_experience, name='lesson_vr_experience'),
 
+     # Dev-only: impersonate a user and open a lesson video (DEBUG only)
+     path('dev/impersonate/<str:username>/<int:lesson_id>/', views.dev_impersonate, name='dev_impersonate'),
+
     # ── STEP 5: Lesson Exam (MCQ) ─────────────────────────────
     path('test/<int:test_id>/take/',       views.take_test,           name='take_test'),
     path('test/<int:test_id>/submit/',     views.submit_test,         name='submit_test'),
@@ -39,6 +42,8 @@ urlpatterns = [
          attention_views.save_attention_report,  name='attention_save'),
     path('attention/alert/',
          attention_views.notify_attention_alert, name='attention_alert'),
+    path('attention/tts-alert/',
+         attention_views.tts_alert,             name='tts_alert'),
 
     # ── Lesson Chatbot API ────────────────────────────────────
     path('lesson/<int:lesson_id>/chat/',

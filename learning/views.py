@@ -1534,6 +1534,15 @@ def classroom_api(request):
         ).first()
         if not student:
             return JsonResponse({'error': 'الطالب غير موجود في صفوفك'}, status=404)
+
+        # ══════════════════════════════════════════════════════════════
+        # التحقق من فترة التسجيل
+        # ══════════════════════════════════════════════════════════════
+        if not _is_registration_period():
+            return JsonResponse({
+                'error': 'إزالة الطلاب متاحة فقط خلال فترة التسجيل (شهر سبتمبر)'
+            }, status=400)
+
         student.classid = None
         student.save(update_fields=['classid'])
         return JsonResponse({'ok': True})
