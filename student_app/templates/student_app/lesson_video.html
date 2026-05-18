@@ -29,15 +29,15 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { direction: rtl; }
 body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color: var(--ink); }
-.lesson-video-wrap { max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem 4rem; }
+.lesson-video-wrap { max-width: 860px; margin: 1.5rem auto; padding: 0 1.2rem 3rem; }
 
 /* ══ Back Link ═════════════════════════════════════════════════ */
 .back-link {
   display: inline-flex; align-items: center; gap: .5rem;
-  color: var(--slate); font-size: .95rem; font-weight: 700;
-  text-decoration: none; margin-bottom: 1.5rem;
-  padding: .5rem 1rem; border-radius: 10px;
-  background: var(--white); border: 2px solid var(--border);
+  color: var(--slate); font-size: .92rem; font-weight: 700;
+  text-decoration: none; margin-bottom: 1rem;
+  padding: .5rem .95rem; border-radius: 10px;
+  background: var(--white); border: 1.5px solid var(--border);
   transition: all .2s;
 }
 .back-link:hover { background: var(--blue-lt); color: var(--blue); border-color: var(--blue-bd); text-decoration: none; }
@@ -73,60 +73,23 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 }
 .video-meta span { display: flex; align-items: center; gap: .4rem; }
 
-.video-body { padding: 2rem; }
+.video-body { padding: 1.5rem; }
 
-.video-player {
-  width: 100%; border-radius: 16px;
-  background: #000; box-shadow: 0 8px 32px rgba(0,0,0,.15);
-  margin-bottom: 2rem;
-}
-
-/* ══ Lesson Info (Inside Video Card) ═══════════════════════════ */
-.lesson-info-section {
-  background: var(--slate-lt);
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  padding: 1.5rem 2rem;
-}
-
-.lesson-info-section-title {
-  font-size: 1.1rem; font-weight: 800; color: var(--ink);
-  margin-bottom: 1.2rem; display: flex; align-items: center; gap: .7rem;
-}
-.lesson-info-section-title i { color: var(--blue); }
-
-.lesson-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-.lesson-info-item {
-  background: var(--white);
-  padding: 1.2rem;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-}
-
-.lesson-info-label {
-  font-size: .8rem; font-weight: 700; color: var(--muted);
-  text-transform: uppercase; letter-spacing: .5px;
-  margin-bottom: .5rem;
-}
-.lesson-info-value {
-  font-size: 1rem; color: var(--ink); line-height: 1.6;
-  font-family: 'Tajawal', sans-serif;
-  font-weight: 600;
-}
+  .video-player {
+    width: 100%; border-radius: 14px;
+    background: #000; box-shadow: 0 6px 24px rgba(0,0,0,.12);
+    margin-bottom: 1.5rem;
+    max-height: 520px;
+  }
 
 .lesson-text-box {
   background: var(--white);
-  padding: 1.5rem;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-  max-height: 300px;
+  padding: 1.3rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  max-height: 260px;
   overflow-y: auto;
-  line-height: 1.9;
+  line-height: 1.8;
   white-space: pre-wrap;
   font-family: 'Tajawal', sans-serif;
   font-size: .95rem;
@@ -200,14 +163,14 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 .attention-toggle-btn.disabled { background: var(--muted); cursor: not-allowed; }
 
 @media(max-width: 768px) {
-  .lesson-video-wrap { padding: 1.5rem 1rem 4rem; }
-  .video-header { padding: 1.5rem; }
-  .video-body { padding: 1.5rem; }
-  .lesson-info-section { padding: 1.5rem; }
-  .lesson-info-grid { grid-template-columns: 1fr; }
-  .attention-tracking-overlay { width: 120px; height: 120px; }
-  .attention-status { bottom: 80px; right: 10px; font-size: .75rem; }
-  .attention-toggle-btn { left: 10px; width: 45px; height: 45px; font-size: 1rem; }
+  .lesson-video-wrap { padding: 1.2rem .85rem 3rem; }
+  .video-header { padding: 1.2rem 1rem; }
+  .video-body { padding: 1.2rem; }
+  .video-player { max-height: 320px; }
+  .lesson-text-box { max-height: 220px; }
+  .attention-tracking-overlay { width: 110px; height: 110px; }
+  .attention-status { bottom: 72px; right: 10px; font-size: .75rem; }
+  .attention-toggle-btn { left: 10px; width: 42px; height: 42px; font-size: .95rem; }
 }
 </style>
 {% endblock %}
@@ -268,41 +231,12 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
         عذراً، المتصفح لا يدعم تشغيل الفيديو.
       </video>
 
-      <!-- ══ Lesson Info Section (Inside Video Card) ═══════════════════════════ -->
-      <div class="lesson-info-section">
-        <div class="lesson-info-section-title">
-          <i class="fas fa-info-circle"></i>
-          معلومات الدرس
-        </div>
-
-        <div class="lesson-info-grid">
-          <div class="lesson-info-item">
-            <div class="lesson-info-label">عنوان الدرس</div>
-            <div class="lesson-info-value">{{ lesson.lessontitle }}</div>
-          </div>
-
-          {% if lesson.video_title %}
-          <div class="lesson-info-item">
-            <div class="lesson-info-label">عنوان الفيديو</div>
-            <div class="lesson-info-value">{{ lesson.video_title }}</div>
-          </div>
-          {% endif %}
-
-          {% if lesson.subjectid %}
-          <div class="lesson-info-item">
-            <div class="lesson-info-label">المادة</div>
-            <div class="lesson-info-value">{{ lesson.subjectid.subjectname }}</div>
-          </div>
-          {% endif %}
-        </div>
-
-        {% if lesson.originaltext %}
-        <div style="margin-top: 1.5rem;">
-          <div class="lesson-info-label" style="margin-bottom: .8rem;">نص الدرس الأصلي</div>
-          <div class="lesson-text-box">{{ lesson.originaltext }}</div>
-        </div>
-        {% endif %}
+      {% if lesson.originaltext %}
+      <div style="margin-bottom: 1.5rem;">
+        <div class="lesson-info-label" style="margin-bottom: .8rem; font-size:.95rem;">نص الدرس الأصلي</div>
+        <div class="lesson-text-box">{{ lesson.originaltext }}</div>
       </div>
+      {% endif %}
 
       <div class="video-note">
         <strong>ملاحظة:</strong> إذا واجهت صعوبة في التشغيل، حاول تحديث الصفحة أو التأكد من اتصال الإنترنت.
