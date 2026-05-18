@@ -202,9 +202,9 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
       <div class="score-bar"><div class="score-fill" id="score-fill" style="width:100%"></div></div>
       <span class="score-num" id="score-num">—</span>
     </div>
-        <button id="stop-btn" onclick="pauseTracking()">
-            <i class="fas fa-pause-circle"></i> إيقاف مؤقت
-        </button>
+    <button id="stop-btn" onclick="stopTracking()">
+      <i class="fas fa-stop-circle"></i> إيقاف
+    </button>
   </div>
   <div id="distraction-banner" role="status" aria-live="polite" style="display:none;"></div>
 
@@ -332,24 +332,24 @@ var TIMING_URL = (function(){
 var ws = null, trackingActive = false, alertTimer = null;
 var _mediaStream = null, _frameInterval = null;
 var _savedWsUrl = null;
+var _sessionState = {
+    pausedByUser: false,
+};
 var _attentionState = {
     distracted: false,
     startTime: null,
     level: 'none',
     lastAlertLevel: null,
     lastToastLevel: null,
-    shortAlertShown: false,
-    longAlertShown: false,
     eyeClosureCount: 0,
     eyeClosureEventActive: false,
     pausedByDistraction: false,
+    pausedByUser: false,
+    significantDistractionCounted: false,
+    totalSignificantDistractionCount: 0,
     consecutiveDistractionCount: 0,
     maxConsecutiveDistractions: 7,
-    totalSignificantDistractionCount: 0,  // ✅ العدد الإجمالي للتشتت الملحوظ في الجلسة
 };
-
-// Session-level flags (user pause state etc.)
-var _sessionState = { pausedByUser: false };
 
 // ══════════════════════════════════════════════════════════════
 // Audio/TTS Management Module
@@ -524,42 +524,12 @@ var AudioManager = (function(){
     }
     
     function _resumeLessonAudioAndSync() {
-        // Only resume if tracking is still active
-        if (!trackingActive) return;
-        
-        // Check local attention state
-        if (_attentionState.distracted) {
-            console.log('[Audio] Still distracted (local), not resuming');
-            return;
-        }
-        
-        // Check server attention state - must be recent and above threshold
-        var now = Date.now();
-        var dataAge = now - _state.lastServerUpdateTime;
-        
-        if (dataAge > _config.serverDataMaxAge) {
-            console.log('[Audio] Server data too old (' + dataAge + 'ms), waiting for fresh data');
-            // Schedule another check
-            _scheduleResumeCheck();
-            return;
-        }
-        
-        if (!_state.lastServerAttentive) {
-            console.log('[Audio] Server reports not attentive, not resuming');
-            _scheduleResumeCheck();
-            return;
-        }
-        
-        if (_state.lastServerAttentionScore < _config.minAttentionScore) {
-            console.log('[Audio] Attention score too low (' + _state.lastServerAttentionScore + '), not resuming');
-            _scheduleResumeCheck();
-            return;
-        }
-        
-        // All checks passed - safe to resume
-        console.log('[Audio] All checks passed, resuming lesson audio');
+        // Only resume if tracking is still active and not paused by user
+        if (!trackingActive || _sessionState.pausedByUser) return;
+
+        console.log('[Audio] Resuming lesson audio after TTS');
         _state.resumeCheckAttempts = 0;
-        
+
         var audio = document.getElementById('topAudio');
         if (audio && audio.paused && _state.lessonAudioPlaying) {
             audio.play().catch(function(e){
@@ -567,7 +537,7 @@ var AudioManager = (function(){
             });
             _state.lessonAudioPlaying = false;
         }
-        
+
         resumeWordHighlight();
         _state.syncActive = true;
     }
@@ -851,14 +821,23 @@ function processAttentionState(s) {
             _attentionState.startTime = now;
             _attentionState.lastAlertLevel = null;
             _attentionState.lastToastLevel = null;
+            _attentionState.significantDistractionCounted = false;
+            // Increment consecutive distraction counter
             _attentionState.consecutiveDistractionCount++;
-            // ✅ زيادة العدد الإجمالي للتشتت الملحوظ عند بداية تشتت جديد
-            _attentionState.totalSignificantDistractionCount++;
-            console.log('[Attention] Total significant distractions: ' + _attentionState.totalSignificantDistractionCount);
+            console.log('[Attention] Consecutive distractions: ' + _attentionState.consecutiveDistractionCount + '/' + _attentionState.maxConsecutiveDistractions);
         }
         duration = (now - (_attentionState.startTime || now)) / 1000;
-        var level = duration >= 7 ? 'long' : duration >= 3 ? 'medium' : 'short';
+        var level = s.is_significant_distraction ? 'long'
+                  : s.is_warning_distraction ? 'medium'
+                  : 'short';
         _attentionState.level = level;
+
+        if (s.is_significant_distraction && !_attentionState.significantDistractionCounted) {
+            _attentionState.totalSignificantDistractionCount++;
+            _attentionState.significantDistractionCounted = true;
+            console.log('[Attention] Total significant distraction episodes: ' + _attentionState.totalSignificantDistractionCount);
+        }
+
         feedbackForDistractionLevel(level, s, duration);
 
         var toastLevel = String(s.distraction_level || 'none').toLowerCase();
@@ -870,16 +849,14 @@ function processAttentionState(s) {
             }
         }
 
-        // Check for consecutive distractions limit
+        // Check if consecutive distractions reached limit
         if (_attentionState.consecutiveDistractionCount >= _attentionState.maxConsecutiveDistractions) {
-            handleConsecutiveDistractionsLimit();
+            handleConsecutiveDistractionStop(s.student_name);
             return;
         }
     } else {
         if (_attentionState.distracted) {
             showDistractionToast('جميل، لقد عدت للتركيز. استمر الآن!', false);
-            _attentionState.consecutiveDistractionCount = 0; // Reset counter on attention return
-            // ✅ لا نعيد تعيين totalSignificantDistractionCount - نحتفظ بالعدد الإجمالي
         }
         _attentionState.distracted = false;
         _attentionState.level = 'none';
@@ -887,10 +864,12 @@ function processAttentionState(s) {
         _attentionState.lastAlertLevel = null;
         _attentionState.lastToastLevel = null;
         _attentionState.eyeClosureEventActive = false;
-        if (_attentionState.pausedByDistraction) {
-            _attentionState.pausedByDistraction = false;
-            resumeLessonAudio();
-        }
+        _attentionState.significantDistractionCounted = false;
+        // Reset consecutive distraction counter when attention returns
+        _attentionState.consecutiveDistractionCount = 0;
+        // Always resume audio when attention returns (unless paused by user)
+        _attentionState.pausedByDistraction = false;
+        resumeLessonAudio();
     }
 }
 
@@ -924,13 +903,11 @@ function pauseLessonAudio() {
 
 function resumeLessonAudio() {
     var audio = document.getElementById('topAudio');
-    // لا تُشغّل التسجيل الصوتي مباشرة
-    // يجب أولاً التأكد من أن الطالب منتبهاً حسب خوارزمية تتبع الانتباه
-    // سيتم التحقق في دالة _resumeLessonAudioAndSync
+    // تشغيل الصوت مباشرة إذا كان التتبع نشطاً ولم يوقفه المستخدم
     if (audio && audio.paused && trackingActive && !_sessionState.pausedByUser) {
-        // التحقق من الانتباه يتم في دالة _resumeLessonAudioAndSync
-        // هنا نستخدم AudioManager للتحديث حالة الانتباه
-        AudioManager.updateServerAttentionState(true, 100);
+        audio.play().catch(function(e){
+            console.log('[Audio] Autoplay blocked:', e);
+        });
     }
     resumeWordHighlight();
 }
@@ -1067,8 +1044,8 @@ function ensureAttentionBarStructure(){
             '<div class="score-bar"><div class="score-fill" id="score-fill" style="width:0%"></div></div>' +
             '<span class="score-num" id="score-num">—</span>' +
         '</div>' +
-        '<button id="stop-btn" onclick="pauseTracking()">' +
-            '<i class="fas fa-pause-circle"></i> إيقاف مؤقت' +
+        '<button id="stop-btn" onclick="stopTracking()">' +
+            '<i class="fas fa-stop-circle"></i> إيقاف' +
         '</button>';
     bar.style.display = 'flex';
     bar.style.alignItems = 'center';
@@ -1227,12 +1204,15 @@ function startFrameSending(){
     var ctx = canvas.getContext('2d');
     var vid = document.getElementById('_cam-feed');
     _frameInterval = setInterval(function(){
-        if (!ws || ws.readyState !== WebSocket.OPEN || !vid || !_mediaStream) return;
-        try{
-            ctx.drawImage(vid, 0, 0, 320, 240);
-            var b64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-            ws.send(JSON.stringify({type:'frame', data:b64}));
-        } catch(e){}
+        if (!vid || !_mediaStream) return;
+        // Only send if WebSocket is connected and tracking is active
+        if (ws && ws.readyState === WebSocket.OPEN && trackingActive) {
+            try{
+                ctx.drawImage(vid, 0, 0, 320, 240);
+                var b64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+                ws.send(JSON.stringify({type:'frame', data:b64}));
+            } catch(e){}
+        }
     }, 300);
 }
 
@@ -1376,14 +1356,6 @@ function handleForceStop(studentName) {
     window.location.href = "{% url 'student:view_lesson_student' lesson.pk %}";
 }
 
-function handleConsecutiveDistractionsLimit() {
-    var fn = 'صديقي';
-    alert(fn + "، تم إيقاف الجلسة تلقائياً بسبب تكرار التشتت " + _attentionState.maxConsecutiveDistractions + " مرات متتالية. يرجى أخذ قسط من الراحة والمحاولة لاحقاً.");
-    AudioManager.stopAll();
-    stopTracking();
-    window.location.href = "{% url 'student:view_lesson_student' lesson.pk %}";
-}
-
 function setSpeed(s, btn){
     var a = document.getElementById('topAudio'); if (a) a.playbackRate = s;
     btn.closest('.audio-speeds').querySelectorAll('.spd-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -1394,14 +1366,12 @@ function pauseTracking(){
     if (!trackingActive) return;
 
     trackingActive = false;
-    pauseFrameSending();  // Keep camera stream active
+    // Keep frame sending active to continue monitoring camera
+    // Only stop WebSocket connection
     if (ws) ws.close();
 
+    _attentionState.pausedByUser = true;
     _sessionState.pausedByUser = true;
-
-    // Stop lesson audio and highlighting
-    pauseLessonAudio();
-    pauseWordHighlight();
 
     updateBar('', 'التتبع متوقف مؤقتاً ⏸️', 0);
 
@@ -1413,6 +1383,7 @@ function pauseTracking(){
 function resumeTracking(){
     if (trackingActive) return;
 
+    _attentionState.pausedByUser = false;
     _sessionState.pausedByUser = false;
 
     // Ensure camera is still active
@@ -1422,15 +1393,29 @@ function resumeTracking(){
         return;
     }
 
-    if (_savedWsUrl) {
-        // Reconnect to existing WebSocket without creating new session
-        trackingActive = true;
-        connectWebSocket(_savedWsUrl);
-        updateBar('', 'جارٍ إعادة الاتصال... انتظر التحقق من الانتباه', 50);
-    } else {
-        // Fallback: create new session if no saved URL
-        startTracking();
-    }
+    // Always create a new session to avoid Flask server connection issues
+    updateBar('', 'جارٍ بدء تتبع الانتباه...', 0);
+    fetch("{% url 'student:attention_start' %}", {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+        body: JSON.stringify({lesson_id: LESSON_ID})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (d.ok && d.ws_url && typeof d.ws_url === 'string'){
+            _savedWsUrl = d.ws_url;
+            trackingActive = true;
+            connectWebSocket(d.ws_url);
+            updateBar('attentive', 'التتبع نشط ✅', 100);
+        } else {
+            showAlert('فشل بدء تتبع الانتباه. سنحاول إعادة المحاولة.');
+            setTimeout(resumeTracking, 3000);
+        }
+    })
+    .catch(function(){
+        showAlert('تعذر التواصل مع خادم تتبع الانتباه. إعادة المحاولة بعد 3 ثوانٍ.');
+        setTimeout(resumeTracking, 3000);
+    });
 
     var btn = document.getElementById('stop-btn');
     if (btn) btn.innerHTML = '<i class="fas fa-stop-circle"></i> إيقاف';

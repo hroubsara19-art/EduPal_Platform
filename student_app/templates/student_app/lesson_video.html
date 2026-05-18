@@ -105,19 +105,7 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
 }
 .video-note strong { font-weight: 800; }
 
-/* ══ Attention Tracking System ═════════════════════════════════ */
-.attention-tracking-overlay {
-  position: fixed; top: 0; right: 0; width: 180px; height: 180px;
-  background: #000; border-radius: 16px; border: 3px solid var(--blue);
-  z-index: 5000; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.3);
-}
-.attention-camera { width: 100%; height: 100%; object-fit: cover; }
-.camera-indicator {
-  position: absolute; top: 8px; right: 8px; width: 10px; height: 10px;
-  background: #ef4444; border-radius: 50%; box-shadow: 0 0 8px #ef4444;
-  animation: pulse-red 1.5s infinite;
-}
-@keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
 
 .attention-alert {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -168,7 +156,6 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
   .video-body { padding: 1.2rem; }
   .video-player { max-height: 320px; }
   .lesson-text-box { max-height: 220px; }
-  .attention-tracking-overlay { width: 110px; height: 110px; }
   .attention-status { bottom: 72px; right: 10px; font-size: .75rem; }
   .attention-toggle-btn { left: 10px; width: 42px; height: 42px; font-size: .95rem; }
 }
@@ -182,10 +169,6 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
      data-student-name="{{ student_name|default:'طالب' }}"
      data-csrf-token="{{ csrf_token|default:'' }}">
   <!-- ══ Attention Tracking System ════════════════════════════════ -->
-  <div class="attention-tracking-overlay" id="attentionCameraOverlay" style="display: none;">
-    <video id="attentionCamera" class="attention-camera" playsinline></video>
-    <div class="camera-indicator"></div>
-  </div>
 
   <div class="attention-alert" id="attentionAlert">
     <div class="attention-alert-icon">
@@ -284,8 +267,8 @@ var _alertState = {
 
 // Configuration
 var _config = {
-  shortDistraction: 3000,    // 3 seconds - text alert with student name
-  longDistraction: 5000,     // 5 seconds - text + audio + pause with student name
+  shortDistraction: 5000,    // 5 seconds - text alert with student name
+  longDistraction: 7000,     // 7 seconds - text + audio + pause with student name
   frameSendRate: 300,        // Send frames every 300ms
   cameraDimensions: { width: 320, height: 240 }
 };
@@ -677,7 +660,10 @@ function onStream(stream) {
   vid.srcObject = stream;
   vid.play().catch(function() {});
   
-  document.getElementById('attentionCameraOverlay').style.display = 'block';
+  var overlay = document.getElementById('attentionCameraOverlay');
+  if (overlay) {
+    overlay.style.display = 'block';
+  }
   
 }
 
@@ -706,7 +692,7 @@ function processAttentionState(s) {
     
     // Calculate duration of current distraction
     var duration = (now - (_attentionState.startTime || now)) / 1000;
-    var newLevel = duration >= 5 ? 'medium' : duration >= 3 ? 'short' : 'none';
+    var newLevel = duration >= 10 ? 'severe' : duration >= 7 ? 'medium' : duration >= 5 ? 'short' : 'none';
     _attentionState.level = newLevel;
     
     // Handle alert based on duration
@@ -735,85 +721,97 @@ function processAttentionState(s) {
 function handleDistractionLevel(level, duration) {
   if (_attentionState.lastAlertLevel === level) return;
   _attentionState.lastAlertLevel = level;
-  
-  // 3 seconds - short alert (text only, no pause)
-  if (level === 'short' && duration >= 3 && duration < 5) {
+
+  if (level === 'short' && duration >= 5 && duration < 7) {
     showShortAlert();
-  } 
-  // 5+ seconds - long alert (text + pause + audio)
-  else if (level === 'medium' && duration >= 5) {
+  } else if (level === 'medium' && duration >= 7 && duration < 10) {
     showLongAlert();
+  } else if (level === 'severe' && duration >= 10) {
+    showSevereAlert();
   }
 }
 
 function showShortAlert() {
-  console.log('[Attention] ✅ Short alert triggered (3 seconds)');
-  
+  if (_alertState.shortAlertShown) return;
+  _alertState.shortAlertShown = true;
+
+  console.log('[Attention] ✅ Short alert triggered (5 seconds)');
+
   var messages = [
-    STUDENT_NAME + '، يرجى التركيز',
-    STUDENT_NAME + '، انتبه للفيديو',
-    STUDENT_NAME + '، عودة للفيديو'
+    'ركز',
+    'عد',
+    'انتباه'
   ];
   var msg = messages[Math.floor(Math.random() * messages.length)];
-  
   var alertElement = document.getElementById('attentionAlert');
   var textElement = document.getElementById('attentionAlertText');
   var iconElement = alertElement ? alertElement.querySelector('.attention-alert-icon') : null;
-  
+
   if (alertElement && textElement && iconElement) {
-    // Update icon to lightbulb (gentle alert)
     iconElement.innerHTML = '<i class="fas fa-lightbulb"></i>';
     textElement.textContent = msg;
     alertElement.classList.add('show');
-    
+
     console.log('[Attention] Short alert shown: "' + msg + '"');
-    
-    // Auto-hide after 2 seconds if still distracted
-      setTimeout(function() {
-        // Only hide if attention regained or the distraction level changed
-        if (!_attentionState.distracted || _attentionState.level !== 'short') {
-          alertElement.classList.remove('show');
-        }
-      }, 2000);
+
+    setTimeout(function() {
+      if (!_attentionState.distracted || _attentionState.level !== 'short') {
+        alertElement.classList.remove('show');
+      }
+    }, 2000);
   }
 }
 
 function showLongAlert() {
-  console.log('[Attention] 🔴 Long alert triggered (5 seconds)');
-  
-  // Pause video
+  console.log('[Attention] 🔴 Long alert triggered (7 seconds)');
+
   if (videoElement && !videoElement.paused) {
     _videoState.pausedBySystem = true;
     videoElement.pause();
-    console.log('[Attention] Video paused due to 5+ second distraction');
+    console.log('[Attention] Video paused due to 7+ second distraction');
   }
-  
-  // Show persistent text alert
-  var alertText = STUDENT_NAME + '\nالفيديو موقوف - يرجى العودة للتركيز';
-  
+
+  var alertText = 'ارجع للدرس';
   var alertElement = document.getElementById('attentionAlert');
   var textElement = document.getElementById('attentionAlertText');
   var iconElement = alertElement ? alertElement.querySelector('.attention-alert-icon') : null;
-  
+
   if (alertElement && textElement && iconElement) {
-    // Update icon to red circle (serious alert)
     iconElement.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
     textElement.textContent = alertText;
     alertElement.classList.add('show');
-    
+
     console.log('[Attention] Long alert shown: "' + alertText + '"');
-    
-    // Mark alert as active
     _alertState.longAlertActive = true;
   }
-  
-  // Play audio alert
-  var audioMsg = STUDENT_NAME + '، يرجى العودة للتركيز';
-  console.log('[Attention] Playing audio alert: "' + audioMsg + '"');
+
+  var audioMsg = 'ارجع للدرس';
   speakAlert(audioMsg, function() {
-    console.log('[Attention] Audio alert finished');
+    console.log('[Attention] Long audio alert finished');
     _alertState.audioPlaying = false;
   });
+}
+
+function showSevereAlert() {
+  console.log('[Attention] 🔥 Severe alert triggered (10 seconds)');
+
+  if (videoElement && !videoElement.paused) {
+    _videoState.pausedBySystem = true;
+    videoElement.pause();
+    console.log('[Attention] Video paused due to 10+ second distraction');
+  }
+
+  var alertText = 'ارجع تركيزك';
+  var alertElement = document.getElementById('attentionAlert');
+  var textElement = document.getElementById('attentionAlertText');
+  var iconElement = alertElement ? alertElement.querySelector('.attention-alert-icon') : null;
+
+  if (alertElement && textElement && iconElement) {
+    iconElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+    textElement.textContent = alertText;
+    alertElement.classList.add('show');
+    _alertState.longAlertActive = true;
+  }
 }
 
 function onAttentiveDetected() {
