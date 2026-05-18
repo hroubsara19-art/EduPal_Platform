@@ -2059,14 +2059,6 @@ def create_test(request):
                 'id': lesson.lessonid, 'title': lesson.lessontitle
             })
 
-    my_tests = (
-        Test.objects
-        .filter(teacherid=teacher)
-        .select_related('lessonid__subjectid__classid')
-        .prefetch_related('question_set')
-        .order_by('-testid')
-    )
-
     return render(request, 'learning/create_test.html', {
         'my_classes':    my_classes,
         'all_subjects':  all_subjects,
@@ -2074,7 +2066,25 @@ def create_test(request):
         'teacher':       teacher,
         'subjects_json': _json.dumps(subjects_json_dict, ensure_ascii=False),
         'lessons_json':  _json.dumps(lessons_json_dict,  ensure_ascii=False),
-        'my_tests':      my_tests,
+    })
+
+@teacher_required
+def previous_tests(request):
+    teacher      = request.teacher
+    my_classes   = _get_teacher_classes(teacher)
+    all_subjects = Subject.objects.filter(teacherid=teacher).select_related('classid').order_by('subjectname')
+    my_tests     = (
+        Test.objects
+        .filter(teacherid=teacher)
+        .select_related('lessonid__subjectid__classid')
+        .prefetch_related('question_set')
+        .order_by('-testid')
+    )
+    return render(request, 'learning/previous_tests.html', {
+        'teacher':      teacher,
+        'my_classes':   my_classes,
+        'all_subjects': all_subjects,
+        'my_tests':     my_tests,
     })
 
 # ══════════════════════════════════════════════════════════════

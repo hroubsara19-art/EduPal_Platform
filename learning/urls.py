@@ -30,6 +30,7 @@ urlpatterns = [
 
     # ── إنشاء الاختبار ────────────────────────────────────────
     path('teacher/create-test/',            learning_views.create_test,       name='create_test'),
+    path('teacher/previous-tests/',         learning_views.previous_tests,    name='previous_tests'),
 
     # ── أدوات توليد الفيديو بالذكاء الاصطناعي ───────────────────
     path('teacher/ai-video-tools/',         learning_views.ai_video_tools,    name='ai_video_tools'),

@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}معاينة الاختبارات السابقة{% endblock %}
+
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+:root{--blue:#1d4ed8;--blue-dk:#1e3a8a;--blue-lt:#eff4ff;--blue-bd:#bfdbfe;
+  --mint:#059669;--rose:#dc2626;--rose-lt:#fef2f2;
+  --ink:#1e293b;--muted:#64748b;--border:#e2e8f0;--bg:#f3f6fb;--card:#fff;--r:14px;
+  --sh:0 2px 12px rgba(29,78,216,.08);}
+*{box-sizing:border-box;}
+body{background:var(--bg);font-family:'Cairo',sans-serif;color:var(--ink);direction:rtl;}
+.ct-wrap{max-width:940px;margin:0 auto;padding:1.75rem 1.25rem 5rem;}
+.ct-header{background:linear-gradient(120deg,#1e3a5f,#1d4ed8);border-radius:1.25rem;
+  padding:1.5rem 2rem;color:#fff;margin-bottom:2rem;display:flex;align-items:center;
+  gap:1rem;box-shadow:0 6px 24px rgba(29,78,216,.22);}
+.ct-header h1{font-size:1.5rem;font-weight:900;margin:0;}
+.ct-header p{font-size:.88rem;opacity:.85;margin:.2rem 0 0;}
+.ct-btn{padding:.65rem 1.4rem;border-radius:8px;border:none;font-size:.9rem;font-weight:700;
+  font-family:'Cairo',sans-serif;cursor:pointer;transition:opacity .2s,transform .15s;
+  display:inline-flex;align-items:center;gap:.4rem;}
+.ct-btn:hover{opacity:.88;transform:translateY(-1px);}
+.ct-btn-primary{background:var(--blue);color:#fff;}
+.ct-btn-ghost{background:var(--bg);color:var(--muted);border:1.5px solid var(--border);}
+.my-tests-wrap{max-width:940px;margin:0 auto;padding:0 1.25rem 4rem;}
+.my-tests-divider{border:none;border-top:2px dashed var(--blue-bd);margin:0 1.25rem 1.5rem;opacity:.6;}
+.my-tests-head{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.1rem;}
+.my-tests-title{font-size:1.05rem;font-weight:800;color:var(--ink);
+  display:flex;align-items:center;gap:.5rem;}
+.my-tests-title i{color:var(--blue);}
+.test-row{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);
+  padding:1rem 1.25rem;margin-bottom:.85rem;display:flex;align-items:center;gap:1rem;
+  box-shadow:var(--sh);transition:border-color .2s;}
+.test-row:hover{border-color:var(--blue-bd);}
+.test-row-icon{width:40px;height:40px;border-radius:10px;background:var(--blue-lt);
+  border:1.5px solid var(--blue-bd);display:flex;align-items:center;justify-content:center;
+  color:var(--blue);font-size:1rem;flex-shrink:0;}
+.test-row-info{flex:1;min-width:0;}
+.test-row-title{font-size:.95rem;font-weight:800;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.test-row-meta{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.3rem;}
+.test-chip{background:var(--blue-lt);border:1.5px solid var(--blue-bd);border-radius:2rem;
+  padding:.15rem .65rem;font-size:.75rem;color:var(--blue-dk);display:inline-flex;
+  align-items:center;gap:.3rem;}
+.test-row-actions{display:flex;gap:.5rem;flex-shrink:0;}
+.tact-btn{display:inline-flex;align-items:center;gap:.3rem;padding:.4rem .85rem;
+  border-radius:7px;font-family:'Cairo',sans-serif;font-size:.8rem;font-weight:700;
+  border:none;cursor:pointer;text-decoration:none;transition:all .15s;}
+.tact-view{background:var(--blue-lt);color:var(--blue);border:1.5px solid var(--blue-bd);}
+.tact-view:hover{background:var(--blue);color:#fff;}
+.tact-del{background:var(--rose-lt);color:var(--rose);border:1.5px solid #fecaca;}
+.tact-del:hover{background:var(--rose);color:#fff;}
+.tests-empty{text-align:center;padding:2.5rem;color:var(--muted);font-size:.9rem;}
+.tests-empty i{font-size:2rem;opacity:.2;display:block;margin-bottom:.5rem;}
+.tests-filter-bar{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center;
+  margin-bottom:1.1rem;}
+.tf-select{padding:.42rem .85rem;border:1.5px solid var(--blue-bd);border-radius:8px;
+  font-family:'Cairo',sans-serif;font-size:.83rem;color:var(--ink);
+  background:var(--blue-lt);cursor:pointer;}
+.tf-select:focus{outline:none;border-color:var(--blue);}
+.tf-reset{padding:.42rem .85rem;border-radius:8px;border:1.5px solid var(--border);
+  background:var(--card);font-family:'Cairo',sans-serif;font-size:.83rem;
+  color:var(--muted);cursor:pointer;}
+.tf-reset:hover{background:var(--blue-lt);color:var(--blue);border-color:var(--blue-bd);}
+.del-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.del-overlay.open{display:flex;}
+.del-box{background:#fff;border-radius:16px;padding:2rem;max-width:380px;width:90%;
+  text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.del-icon{width:52px;height:52px;background:var(--rose-lt);border:2px solid #fecaca;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--rose);font-size:1.2rem;margin:0 auto .9rem;}
+.del-box h3{font-family:'Cairo',sans-serif;font-size:1rem;font-weight:800;margin-bottom:.4rem;}
+.del-box p{font-size:.85rem;color:var(--muted);margin-bottom:1.25rem;}
+.del-btns{display:flex;gap:.6rem;justify-content:center;}
+.del-cancel{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;
+  padding:.55rem 1.2rem;border-radius:8px;font-family:'Cairo',sans-serif;
+  font-size:.88rem;font-weight:700;cursor:pointer;}
+.del-confirm{background:var(--rose);color:#fff;border:none;padding:.55rem 1.25rem;
+  border-radius:8px;font-family:'Cairo',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;}
+.del-confirm:hover{opacity:.88;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ct-wrap" dir="rtl">
+  <div class="ct-header">
+    <i class="fas fa-list-alt fa-2x opacity-75"></i>
+    <div>
+      <h1>معاينة الاختبارات السابقة</h1>
+      <p>يمكنك هنا مراجعة الاختبارات المنشورة بشكل مستقل عن صفحة إنشاء الاختبار.</p>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end mb-4">
+    <a href="{% url 'learning:create_test' %}" class="ct-btn ct-btn-primary">
+      <i class="fas fa-plus-circle"></i> إنشاء اختبار جديد
+    </a>
+  </div>
+
+  <div class="my-tests-wrap" dir="rtl">
+    <div class="my-tests-head">
+      <div class="my-tests-title">
+        <i class="fas fa-folder-open"></i>
+        الاختبارات السابقة
+        <span style="background:var(--blue-lt);border:1px solid var(--blue-bd);border-radius:2rem;
+              padding:.1rem .65rem;font-size:.78rem;color:var(--blue-dk);margin-right:.25rem;">
+          {{ my_tests|length }}
+        </span>
+      </div>
+    </div>
+
+    <div class="tests-filter-bar">
+      <select class="tf-select" id="filterClass" onchange="filterTests()">
+        <option value="">كل الصفوف</option>
+        {% for cls in my_classes %}
+        <option value="{{ cls.classid }}">{{ cls.classname }}</option>
+        {% endfor %}
+      </select>
+      <select class="tf-select" id="filterSubject" onchange="filterTests()">
+        <option value="">كل المواد</option>
+        {% for subj in all_subjects %}
+        <option value="{{ subj.subjectid }}">{{ subj.subjectname }}</option>
+        {% endfor %}
+      </select>
+      <select class="tf-select" id="filterScope" onchange="filterTests()">
+        <option value="">كل الأنواع</option>
+        <option value="lesson">مرتبط بدرس</option>
+        <option value="subject">عام للمادة</option>
+      </select>
+      <button class="tf-reset" onclick="resetFilter()">
+        <i class="fas fa-undo"></i> إعادة
+      </button>
+    </div>
+
+    {% if my_tests %}
+      {% for t in my_tests %}
+      <div class="test-row" id="testrow-{{ t.testid }}"
+           data-class="{% if t.lessonid and t.lessonid.subjectid.classid_id %}{{ t.lessonid.subjectid.classid_id }}{% elif t.subjectid and t.subjectid.classid_id %}{{ t.subjectid.classid_id }}{% else %}{{ '' }}{% endif %}"
+           data-subject="{% if t.lessonid and t.lessonid.subjectid_id %}{{ t.lessonid.subjectid_id }}{% elif t.subjectid_id %}{{ t.subjectid_id }}{% else %}{{ '' }}{% endif %}"
+           data-scope="{% if t.lessonid %}lesson{% else %}subject{% endif %}">
+        <div class="test-row-icon"><i class="fas fa-file-alt"></i></div>
+        <div class="test-row-info">
+          <div class="test-row-title">{{ t.testtitle }}</div>
+          <div class="test-row-meta">
+            {% if t.lessonid and t.lessonid.subjectid %}
+            <span class="test-chip"><i class="fas fa-book"></i> {{ t.lessonid.subjectid.subjectname }}</span>
+            {% elif t.subjectid %}
+            <span class="test-chip"><i class="fas fa-book"></i> {{ t.subjectid.subjectname }}</span>
+            {% endif %}
+            {% if t.lessonid and t.lessonid.subjectid.classid %}
+            <span class="test-chip"><i class="fas fa-door-open"></i> {{ t.lessonid.subjectid.classid.classname }}</span>
+            {% elif t.subjectid and t.subjectid.classid %}
+            <span class="test-chip"><i class="fas fa-door-open"></i> {{ t.subjectid.classid.classname }}</span>
+            {% endif %}
+            <span class="test-chip"><i class="fas fa-list-ol"></i> {{ t.question_set.count }} سؤال</span>
+            {% if t.durationtaken %}
+            <span class="test-chip"><i class="fas fa-clock"></i> {{ t.durationtaken }} دقيقة</span>
+            {% endif %}
+            <span class="test-chip test-chip-scope"
+                  data-lesson="{% if t.lessonid %}1{% else %}0{% endif %}">
+              <i class="fas fa-{% if t.lessonid %}link{% else %}globe{% endif %}"></i>
+              {% if t.lessonid %}مرتبط بدرس{% else %}عام للمادة{% endif %}
+            </span>
+          </div>
+        </div>
+        <div class="test-row-actions">
+          <a href="{% url 'learning:teacher_test_detail' t.testid %}" class="tact-btn tact-view">
+            <i class="fas fa-edit"></i> تعديل
+          </a>
+          <button class="tact-btn tact-del"
+                  type="button"
+                  data-testid="{{ t.testid }}"
+                  data-title="{{ t.testtitle }}"
+                  onclick="openDelModal(this.dataset.testid, this.dataset.title)">
+            <i class="fas fa-trash"></i> حذف
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="tests-empty">
+        <i class="fas fa-clipboard-list"></i>
+        لم تنشئ أي اختبار بعد.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="del-overlay" id="delOverlay">
+  <div class="del-box">
+    <div class="del-icon"><i class="fas fa-trash"></i></div>
+    <h3>تأكيد حذف الاختبار</h3>
+    <p>هل تريد حذف هذا الاختبار نهائياً؟</p>
+    <div id="delTestName" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:8px;
+         padding:.55rem 1rem;margin-bottom:1rem;font-weight:800;color:#dc2626;font-size:.92rem;">
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:1.25rem;">
+      سيُحذف الاختبار مع جميع أسئلته ومحاولات الطلاب. <strong>لا يمكن التراجع.</strong>
+    </p>
+    <div class="del-btns">
+      <button class="del-cancel" onclick="closeDelModal()">
+        <i class="fas fa-times me-1"></i> إلغاء
+      </button>
+      <form id="delForm" method="POST" action="" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="del-confirm">
+          <i class="fas fa-trash me-1"></i> نعم، احذف نهائياً
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openDelModal(testId, title) {
+  document.getElementById('delTestName').textContent = '🗑 ' + title;
+  document.getElementById('delForm').action = '/teacher/test/' + testId + '/delete/';
+  document.getElementById('delOverlay').classList.add('open');
+}
+function closeDelModal() {
+  document.getElementById('delOverlay').classList.remove('open');
+}
+document.addEventListener('click', function(e) {
+  if (e.target === document.getElementById('delOverlay')) closeDelModal();
+});
+
+function filterTests() {
+  var filterCls  = document.getElementById('filterClass').value;
+  var filterSubj = document.getElementById('filterSubject').value;
+  var filterScp  = document.getElementById('filterScope').value;
+  var rows       = document.querySelectorAll('.test-row');
+  var visible    = 0;
+  rows.forEach(function(row) {
+    var match = true;
+    if (filterCls  && row.dataset.class   !== filterCls)   match = false;
+    if (filterSubj && row.dataset.subject !== filterSubj)  match = false;
+    if (filterScp  && row.dataset.scope   !== filterScp)   match = false;
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  var emptyMsg = document.getElementById('filter-empty-msg');
+  if (!emptyMsg) {
+    emptyMsg = document.createElement('div');
+    emptyMsg.id = 'filter-empty-msg';
+    emptyMsg.className = 'tests-empty-filter';
+    emptyMsg.innerHTML = '<i class="fas fa-search" style="margin-left:.4rem;"></i>لا توجد اختبارات تطابق هذه التصفية.';
+    var wrap = document.querySelector('.my-tests-wrap');
+    if (wrap) wrap.appendChild(emptyMsg);
+  }
+  emptyMsg.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function resetFilter() {
+  document.getElementById('filterClass').value   = '';
+  document.getElementById('filterSubject').value = '';
+  document.getElementById('filterScope').value   = '';
+  filterTests();
+}
+</script>
+{% endblock %}

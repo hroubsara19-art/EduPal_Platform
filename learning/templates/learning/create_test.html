@@ -328,6 +328,12 @@ body{background:var(--bg);font-family:'Cairo',sans-serif;color:var(--ink);direct
       </button>
     </div>
   </form>
+
+  <div class="mt-4 text-center">
+    <a href="{% url 'learning:previous_tests' %}" class="ct-btn ct-btn-ghost" style="min-width:220px;">
+      <i class="fas fa-eye"></i> معاينة الاختبارات السابقة
+    </a>
+  </div>
 </div>
 
 <!-- Modal: تأكيد النشر -->
@@ -393,99 +399,7 @@ body{background:var(--bg);font-family:'Cairo',sans-serif;color:var(--ink);direct
 </div>
 
 
-<!-- ══ قسم الاختبارات السابقة ══ -->
-<hr class="my-tests-divider">
-<div class="my-tests-wrap" dir="rtl">
-  <div class="my-tests-head">
-    <div class="my-tests-title">
-      <i class="fas fa-list-alt"></i>
-      الاختبارات السابقة
-      <span style="background:var(--blue-lt);border:1px solid var(--blue-bd);border-radius:2rem;
-            padding:.1rem .65rem;font-size:.78rem;color:var(--blue-dk);margin-right:.25rem;">
-        {{ my_tests|length }}
-      </span>
-    </div>
-  </div>
 
-  <!-- ── شريط التصفية ── -->
-  <div class="tests-filter-bar">
-    <select class="tf-select" id="filterClass" onchange="filterTests()">
-      <option value="">كل الصفوف</option>
-      {% for cls in my_classes %}
-      <option value="{{ cls.classid }}">{{ cls.classname }}</option>
-      {% endfor %}
-    </select>
-    <select class="tf-select" id="filterSubject" onchange="filterTests()">
-      <option value="">كل المواد</option>
-      {% for subj in all_subjects %}
-      <option value="{{ subj.subjectid }}">{{ subj.subjectname }}</option>
-      {% endfor %}
-    </select>
-    <select class="tf-select" id="filterScope" onchange="filterTests()">
-      <option value="">كل الأنواع</option>
-      <option value="lesson">مرتبط بدرس</option>
-      <option value="subject">عام للمادة</option>
-    </select>
-    <button class="tf-reset" onclick="resetFilter()">
-      <i class="fas fa-undo"></i> إعادة
-    </button>
-  </div>
-
-  {% if my_tests %}
-  {% for t in my_tests %}
-  <div class="test-row" id="testrow-{{ t.testid }}"
-       data-class="{% if t.lessonid and t.lessonid.subjectid.classid_id %}{{ t.lessonid.subjectid.classid_id }}{% elif t.subjectid and t.subjectid.classid_id %}{{ t.subjectid.classid_id }}{% else %}{{ '' }}{% endif %}"
-       data-subject="{% if t.lessonid and t.lessonid.subjectid_id %}{{ t.lessonid.subjectid_id }}{% elif t.subjectid_id %}{{ t.subjectid_id }}{% else %}{{ '' }}{% endif %}"
-       data-scope="{% if t.lessonid %}lesson{% else %}subject{% endif %}">
-    <div class="test-row-icon"><i class="fas fa-file-alt"></i></div>
-    <div class="test-row-info">
-      <div class="test-row-title">{{ t.testtitle }}</div>
-      <div class="test-row-meta">
-        {% if t.lessonid and t.lessonid.subjectid %}
-        <span class="test-chip"><i class="fas fa-book"></i> {{ t.lessonid.subjectid.subjectname }}</span>
-        {% elif t.subjectid %}
-        <span class="test-chip"><i class="fas fa-book"></i> {{ t.subjectid.subjectname }}</span>
-        {% endif %}
-        {% if t.lessonid and t.lessonid.subjectid.classid %}
-        <span class="test-chip"><i class="fas fa-door-open"></i> {{ t.lessonid.subjectid.classid.classname }}</span>
-        {% elif t.subjectid and t.subjectid.classid %}
-        <span class="test-chip"><i class="fas fa-door-open"></i> {{ t.subjectid.classid.classname }}</span>
-        {% endif %}
-        <span class="test-chip"><i class="fas fa-list-ol"></i> {{ t.question_set.count }} سؤال</span>
-        {% if t.durationtaken %}
-        <span class="test-chip"><i class="fas fa-clock"></i> {{ t.durationtaken }} دقيقة</span>
-        {% endif %}
-        <span class="test-chip test-chip-scope"
-              data-lesson="{% if t.lessonid %}1{% else %}0{% endif %}">
-          <i class="fas fa-{% if t.lessonid %}link{% else %}globe{% endif %}"></i>
-          {% if t.lessonid %}مرتبط بدرس{% else %}عام للمادة{% endif %}
-        </span>
-      </div>
-    </div>
-    <div class="test-row-actions">
-      <a href="{% url 'learning:teacher_test_detail' t.testid %}" class="tact-btn"
-         style="background:var(--blue-lt);color:var(--blue);border:1.5px solid var(--blue-bd);">
-        <i class="fas fa-edit"></i> تعديل
-      </a>
-      <button class="tact-btn tact-del"
-              data-testid="{{ t.testid }}"
-              data-title="{{ t.testtitle }}"
-              onclick="openDelModal(this.dataset.testid, this.dataset.title)">
-        <i class="fas fa-trash"></i> حذف
-      </button>
-    </div>
-  </div>
-  {% endfor %}
-
-  {% else %}
-  <div class="tests-empty">
-    <i class="fas fa-clipboard-list"></i>
-    لم تنشئ أي اختبار بعد.
-  </div>
-  {% endif %}
-</div>
-
-<!-- ══ Modal معاينة الاختبار ══ -->
 <div class="pv-overlay" id="pvOverlay">
   <div class="pv-modal">
     <div class="pv-head">

@@ -345,6 +345,7 @@ var _attentionState = {
     pausedByDistraction: false,
     consecutiveDistractionCount: 0,
     maxConsecutiveDistractions: 7,
+    totalSignificantDistractionCount: 0,  // ✅ العدد الإجمالي للتشتت الملحوظ في الجلسة
 };
 
 // Session-level flags (user pause state etc.)
@@ -851,6 +852,9 @@ function processAttentionState(s) {
             _attentionState.lastAlertLevel = null;
             _attentionState.lastToastLevel = null;
             _attentionState.consecutiveDistractionCount++;
+            // ✅ زيادة العدد الإجمالي للتشتت الملحوظ عند بداية تشتت جديد
+            _attentionState.totalSignificantDistractionCount++;
+            console.log('[Attention] Total significant distractions: ' + _attentionState.totalSignificantDistractionCount);
         }
         duration = (now - (_attentionState.startTime || now)) / 1000;
         var level = duration >= 7 ? 'long' : duration >= 3 ? 'medium' : 'short';
@@ -875,6 +879,7 @@ function processAttentionState(s) {
         if (_attentionState.distracted) {
             showDistractionToast('جميل، لقد عدت للتركيز. استمر الآن!', false);
             _attentionState.consecutiveDistractionCount = 0; // Reset counter on attention return
+            // ✅ لا نعيد تعيين totalSignificantDistractionCount - نحتفظ بالعدد الإجمالي
         }
         _attentionState.distracted = false;
         _attentionState.level = 'none';
