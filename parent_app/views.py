@@ -103,6 +103,8 @@ def parent_portal(request):
         for subj_name, reps in subj_map.items():
             scores_list = [r.testscore for r in reps if r.testscore is not None]
             avg_g  = round(sum(scores_list) / len(scores_list), 1) if scores_list else 0
+            # حساب نسبة الإنجاز بناءً على عدد الدروس المكتملة فعلياً
+            completion = min(100, len(reps) * 10) if len(reps) > 0 else 0
             # حساب نسبة الإنجاز بناءً على عدد الدروس المكتملة فعلياً مقارنة بالعدد الكلي للدروس في المادة
             subject_id = reps[0].lessonid.subjectid.subjectid if reps[0].lessonid and reps[0].lessonid.subjectid else None
             total_lessons = Lessoncontent.objects.filter(subjectid=subject_id).count() if subject_id else 0
@@ -195,6 +197,7 @@ def parent_portal(request):
         'unread_notifications':  unread_notifications,
         'unread_count':          len(unread_notifications),
         'teacher_notes':         teacher_notes,
+        'chart_data':            chart_data,
         'chart_data':            json.dumps(chart_data, ensure_ascii=False),
     })
 
