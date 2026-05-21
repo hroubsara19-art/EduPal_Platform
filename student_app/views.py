@@ -405,7 +405,9 @@ def lesson_session(request, lesson_id):
             clean_audio = clean_audio[len('media/'):]
         words_json_url = _media_file_url_if_exists(clean_audio + '.json')
 
-    session_id   = f"lesson_{lesson.pk}_student_{student.pk if student else 0}"
+    # session_id should be a real Learningsession pk or null
+    # For now, we'll pass null since we don't create a Learningsession
+    session_id   = None
     student_name = request.user.fullname or request.user.username
     timing_url   = words_json_url or ''
 

@@ -2011,3 +2011,7 @@ WARNING 2026-05-21 18:47:52,389 views save_lesson audio regen failed: No audio w
 WARNING 2026-05-21 18:54:54,406 views save_lesson audio regen failed: No audio was received. Please verify that your parameters are correct.
 WARNING 2026-05-21 19:10:02,981 views Audio re-generation failed: No audio was received. Please verify that your parameters are correct.
 WARNING 2026-05-21 21:24:06,047 views save_lesson audio regen failed: No audio was received. Please verify that your parameters are correct.
+ERROR 2026-05-21 22:22:15,338 views student_checkpoint_answer error: Field 'sessionid' expected a number but got 'lesson_167_student_2'.
+ERROR 2026-05-21 22:33:36,501 views student_checkpoint_answer error: Field 'sessionid' expected a number but got 'lesson_167_student_2'.
+ERROR 2026-05-21 22:40:23,457 views student_checkpoint_answer error: Field 'sessionid' expected a number but got 'lesson_167_student_2'.
+ERROR 2026-05-21 22:40:41,713 views student_checkpoint_answer error: Field 'sessionid' expected a number but got 'lesson_167_student_2'.

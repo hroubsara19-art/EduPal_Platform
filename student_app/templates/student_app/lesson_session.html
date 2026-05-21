@@ -348,10 +348,12 @@ var CHAT_USED  = JSON.parse(document.getElementById('dj-chat-used').textContent)
 
 // Checkpoint data
 var CHECKPOINTS = JSON.parse(document.getElementById('dj-checkpoints').textContent || '[]');
+console.log('[Checkpoint] Loaded CHECKPOINTS:', CHECKPOINTS);
 var checkpointsMap = {};
 CHECKPOINTS.forEach(function(cp){
   checkpointsMap[cp.paragraph_index] = cp;
 });
+console.log('[Checkpoint] checkpointsMap:', checkpointsMap);
 var currentCheckpoint = null;
 var audioPausedForCheckpoint = false;
 var checkpointAnswered = {};
@@ -1409,6 +1411,8 @@ function setSpeed(s, btn){
 // ══════════════════════════════════════════════════════════════
 function onParagraphEnd(paraIndex) {
     console.log('[Checkpoint] Paragraph ended:', paraIndex);
+    console.log('[Checkpoint] checkpointsMap:', checkpointsMap);
+    console.log('[Checkpoint] checkpointAnswered:', checkpointAnswered);
 
     // Check if this paragraph has a checkpoint
     var checkpoint = checkpointsMap[paraIndex];
@@ -1424,6 +1428,7 @@ function onParagraphEnd(paraIndex) {
     }
 
     // Show checkpoint popup
+    console.log('[Checkpoint] Showing popup for checkpoint:', checkpoint);
     showCheckpointPopup(checkpoint);
 }
 
@@ -1700,12 +1705,26 @@ window.addEventListener('beforeunload', function(){
     if (firstBlock) firstBlock.classList.add('para-active');
 
     var audio = document.getElementById('topAudio');
+    var lastParaIdx = -1;
     if (audio && paras.length > 0){
         audio.addEventListener('timeupdate', function(){
             if (!audio.duration) return;
             var paraIdx = Math.min(Math.floor((audio.currentTime / audio.duration) * paras.length), paras.length - 1);
             var blocks  = container.querySelectorAll('.std-para-block');
             blocks.forEach(function(b, bi){ if (bi === paraIdx) b.classList.add('para-active'); else b.classList.remove('para-active'); });
+
+            // Trigger checkpoint when paragraph changes (fallback if WordHighlight doesn't work)
+            if (paraIdx !== lastParaIdx && lastParaIdx >= 0 && typeof onParagraphEnd === 'function') {
+                onParagraphEnd(lastParaIdx);
+            }
+            lastParaIdx = paraIdx;
+        });
+
+        // Also trigger checkpoint when audio ends (for last paragraph)
+        audio.addEventListener('ended', function(){
+            if (typeof onParagraphEnd === 'function') {
+                onParagraphEnd(paras.length - 1);
+            }
         });
     }
 
@@ -1725,91 +1744,14 @@ window.addEventListener('beforeunload', function(){
     }
 })();
 
-/* Checkpoint Functions */
-function showCheckpointPopup(paraIdx){
-  var checkpoint = checkpointsMap[paraIdx];
-  if(!checkpoint) return;
-  
-  currentCheckpoint = checkpoint;
-  document.getElementById('checkpointQuestion').textContent = checkpoint.question;
-  document.getElementById('checkpointOptionA').textContent = checkpoint.option_a;
-  document.getElementById('checkpointOptionB').textContent = checkpoint.option_b;
-  
-  // Pause audio if playing
-  var audio = document.getElementById('topAudio');
-  if(audio && !audio.paused){
-    audio.pause();
-    audioPausedForCheckpoint = true;
-  }
-  
-  document.getElementById('checkpointPopup').classList.remove('d-none');
-}
-
-function hideCheckpointPopup(){
-  document.getElementById('checkpointPopup').classList.add('d-none');
-  currentCheckpoint = null;
-  
-  // Resume audio if it was paused
-  var audio = document.getElementById('topAudio');
-  if(audio && audioPausedForCheckpoint){
-    audio.play();
-    audioPausedForCheckpoint = false;
-  }
-}
-
-function selectCheckpointAnswer(answer){
-  if(!currentCheckpoint) return;
-
-  // Mark selected option visually
-  document.querySelectorAll('.checkpoint-option').forEach(function(opt){
-    opt.classList.remove('selected');
-  });
-  document.getElementById('checkpointOption' + answer).classList.add('selected');
-
-  // Save answer to server (without showing result to student)
-  var data = {
-    checkpoint_id: currentCheckpoint.checkpoint_id,
-    selected_answer: answer,
-    session_id: SESSION_ID
-  };
-
-  fetch('/learning/checkpoint/answer/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': CSRF_TOKEN
-    },
-    body: JSON.stringify(data)
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    // Hide popup after short delay to show selection was made
-    setTimeout(function(){
-      hideCheckpointPopup();
-    }, 500);
-  })
-  .catch(function(){
-    // Hide popup even if save fails (no error shown to student)
-    setTimeout(function(){
-      hideCheckpointPopup();
-    }, 500);
-  });
-}
-
-// Trigger checkpoint at paragraph end (called when audio finishes paragraph)
-function onParagraphEnd(paraIdx){
-  if(checkpointsMap[paraIdx]){
-    showCheckpointPopup(paraIdx);
-  }
-}
 </script>
 
 <script>
 (function(global){
 'use strict';
 
-var ADVANCE   = 0.18;
-var TOLERANCE = 0.22;
+var ADVANCE   = -0.05;
+var TOLERANCE = 0.10;
 
 var _audio       = null;
 var _map         = [];

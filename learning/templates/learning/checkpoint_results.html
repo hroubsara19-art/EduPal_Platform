@@ -109,7 +109,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Cairo','Ta
           <div class="checkpoint-meta">
             <span><i class="fas fa-check-circle correct"></i> الإجابة الصحيحة: {{ cp.correct_answer }}</span>
             <span><i class="fas fa-users"></i> {{ cp.total_answers }} إجابة</span>
-            <span><i class="fas fa-chart-pie correct"></i> {{ cp.correct_count }} صحيحة ({{ cp.correct_count|floatformat:0 }}%)</span>
+            <span><i class="fas fa-chart-pie correct"></i> {{ cp.correct_count }} صحيحة ({% if cp.total_answers > 0 %}{% widthratio cp.correct_count cp.total_answers 100 %}{% else %}0{% endif %}%)</span>
           </div>
         </div>
       </div>
@@ -121,7 +121,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Cairo','Ta
             <th>اسم الطالب</th>
             <th>إجابته</th>
             <th>النتيجة</th>
-            <th>وقت الإجابة</th>
+            <th>المدة الزمنية</th>
           </tr>
         </thead>
         <tbody>
@@ -132,7 +132,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Cairo','Ta
             <td class="{% if ans.is_correct %}answer-correct{% else %}answer-wrong{% endif %}">
               {% if ans.is_correct %}صحيحة{% else %}خاطئة{% endif %}
             </td>
-            <td>{{ ans.answered_at }}</td>
+            <td>{% if ans.response_time %}{{ ans.response_time|floatformat:1 }} ثانية{% else %}—{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
