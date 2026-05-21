@@ -455,3 +455,71 @@ class Performancereport(models.Model):
         indexes  = [
             models.Index(fields=['studentid', '-reportdate'], name='idx_report_student_date'),
         ]
+
+
+# ════════════════════════════════════════════════════════════════
+# Checkpoint (نقاط تحقق معرفي)
+# ════════════════════════════════════════════════════════════════
+class Checkpoint(models.Model):
+    checkpointid = models.AutoField(db_column='CheckpointID', primary_key=True)
+    lessonid = models.ForeignKey(Lessoncontent, on_delete=models.CASCADE, db_column='LessonID')
+    paragraph_index = models.IntegerField(db_column='ParagraphIndex', help_text='رقم الفقرة (يبدأ من 0)')
+    question = models.CharField(db_column='Question', max_length=500, help_text='سؤال قصير للفقرة')
+    option_a = models.CharField(db_column='OptionA', max_length=300, help_text='الخيار الأول')
+    option_b = models.CharField(db_column='OptionB', max_length=300, help_text='الخيار الثاني')
+    correct_answer = models.CharField(
+        db_column='CorrectAnswer',
+        max_length=10,
+        choices=[('A', 'A'), ('B', 'B')],
+        help_text='الإجابة الصحيحة (للمعلم فقط)'
+    )
+    created_at = models.DateTimeField(db_column='CreatedAt', auto_now_add=True)
+    updated_at = models.DateTimeField(db_column='UpdatedAt', auto_now=True)
+
+    class Meta:
+        managed  = True
+        db_table = 'Checkpoint'
+        unique_together = [('lessonid', 'paragraph_index')]
+        indexes  = [
+            models.Index(fields=['lessonid'], name='idx_chk_lesson'),
+            models.Index(fields=['lessonid', 'paragraph_index'], name='idx_chk_lesson_para'),
+        ]
+
+    def __str__(self):
+        return f"Checkpoint for Lesson {self.lessonid_id}, Paragraph {self.paragraph_index}"
+
+
+# ════════════════════════════════════════════════════════════════
+# StudentCheckpointAnswer (إجابات الطلاب على نقاط التحقق)
+# ════════════════════════════════════════════════════════════════
+class StudentCheckpointAnswer(models.Model):
+    answerid = models.AutoField(db_column='AnswerID', primary_key=True)
+    checkpoint = models.ForeignKey(Checkpoint, on_delete=models.CASCADE, db_column='CheckpointID')
+    studentid = models.ForeignKey(Student, on_delete=models.CASCADE, db_column='StudentID')
+    sessionid = models.ForeignKey(Learningsession, on_delete=models.CASCADE, db_column='SessionID', null=True, blank=True)
+    selected_answer = models.CharField(
+        db_column='SelectedAnswer',
+        max_length=10,
+        choices=[('A', 'A'), ('B', 'B')],
+        help_text='الإجابة التي اختارها الطالب'
+    )
+    response_time = models.FloatField(
+        db_column='ResponseTime',
+        null=True,
+        blank=True,
+        help_text='المدة الزمنية التي احتاجها الطالب للاختيار (بالثواني)'
+    )
+    answered_at = models.DateTimeField(db_column='AnsweredAt', auto_now_add=True)
+
+    class Meta:
+        managed  = True
+        db_table = 'StudentCheckpointAnswer'
+        unique_together = [('checkpoint', 'studentid', 'sessionid')]
+        indexes  = [
+            models.Index(fields=['studentid'], name='idx_stud_chk_ans'),
+            models.Index(fields=['checkpoint'], name='idx_chk_ans_chk'),
+            models.Index(fields=['sessionid'], name='idx_chk_ans_sess'),
+        ]
+
+    def __str__(self):
+        return f"Student {self.studentid_id} answered Checkpoint {self.checkpoint_id}: {self.selected_answer}"

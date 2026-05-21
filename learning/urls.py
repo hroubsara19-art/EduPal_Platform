@@ -56,6 +56,14 @@ urlpatterns = [
     # ── تعديل وحذف أسئلة الاختبار ───────────────────────────
     path('teacher/test/question/update/', learning_views.update_question, name='update_question'),
     path('teacher/test/question/delete/', learning_views.delete_question, name='delete_question'),
+
+    # ── نقاط التحقق المعرفي (Checkpoints) ─────────────────────
+    path('lesson/<int:lesson_id>/checkpoint/create/', learning_views.checkpoint_create, name='checkpoint_create'),
+    path('checkpoint/<int:checkpoint_id>/update/', learning_views.checkpoint_update, name='checkpoint_update'),
+    path('checkpoint/<int:checkpoint_id>/delete/', learning_views.checkpoint_delete, name='checkpoint_delete'),
+    path('lesson/<int:lesson_id>/checkpoint/list/', learning_views.checkpoint_list, name='checkpoint_list'),
+    path('checkpoint/answer/', learning_views.student_checkpoint_answer, name='student_checkpoint_answer'),
+    path('lesson/<int:lesson_id>/checkpoint/results/', learning_views.checkpoint_results, name='checkpoint_results'),
 ]
 
 if settings.DEBUG:

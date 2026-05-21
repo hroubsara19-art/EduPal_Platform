@@ -21,6 +21,7 @@ from .models import (
     AiAgent, Lessoncontent, Teacher, Student,
     Testattempt,Subject, Class, Learningsession,
     Test, Question, User as UserModel, LessonWatchRecord,
+    Checkpoint, StudentCheckpointAnswer,
 )
 from .utils import process_lesson_with_ai
 from accounts.info_forms import (
@@ -1008,13 +1009,33 @@ def lesson_result(request, lesson_id):
         candidate = str(lesson.ai_audiopath).strip() + '.json'
         if os.path.exists(os.path.join(settings.MEDIA_ROOT, candidate)):
             timing_url = candidate
- 
+
+    # جلب نقاط التحقق للدرس
+    checkpoints = Checkpoint.objects.filter(lessonid=lesson).order_by('paragraph_index')
+    checkpoint_data = []
+    for cp in checkpoints:
+        checkpoint_data.append({
+            'checkpoint_id': cp.checkpointid,
+            'paragraph_index': cp.paragraph_index,
+            'question': cp.question,
+            'option_a': cp.option_a,
+            'option_b': cp.option_b,
+        })
+
+    # تحضير النص للعرض
+    raw_text = lesson.ai_generatedtext or lesson.originaltext or ''
+    # إذا كان النص فارغاً، استخدم نص افتراضي
+    if not raw_text or not raw_text.strip():
+        raw_text = ''
+
     return render(request, 'learning/lesson_result.html', {
         'lesson':     lesson,
         'image_list': image_list,
         'audio_url':  audio_url or '',
         'timing_url': timing_url,
         'MEDIA_URL':  settings.MEDIA_URL,
+        'checkpoints': checkpoint_data,
+        'raw_text':   raw_text,
     })
 
 @login_required
@@ -1039,6 +1060,12 @@ def publish_lesson(request, lesson_id):
     if request.method == 'POST':
         updated_text = request.POST.get('updated_text', '').strip()
         if updated_text:
+            # ✅ التحقق من وجود نقطة تحقق واحدة على الأقل قبل النشر
+            checkpoint_count = Checkpoint.objects.filter(lessonid=lesson).count()
+            if checkpoint_count == 0:
+                messages.error(request, 'يجب إضافة نقطة تحقق واحدة على الأقل للدرس قبل نشره.')
+                return redirect('learning:lesson_result', lesson_id=lesson.pk)
+            
             clean = _sanitize_text(updated_text)
             lesson.ai_generatedtext = clean
             lesson.status = STATUS_PUBLISHED
@@ -1243,6 +1270,244 @@ def save_lesson(request, lesson_id):
             resp['new_audio_url'] = new_audio_url
     resp['message'] = msg
     return JsonResponse(resp)
+
+
+# ════════════════════════════════════════════════════════════════
+# Checkpoint API Endpoints (نقاط التحقق المعرفي)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@require_POST
+def checkpoint_create(request, lesson_id):
+    """إنشاء نقطة تحقق جديدة لفقرة معينة"""
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role = getattr(request.user, 'userrole', None)
+
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+
+    lesson = get_object_or_404(Lessoncontent, pk=lesson_id)
+    teacher = Teacher.objects.filter(userid=request.user).first()
+
+    if teacher and lesson.teacherid != teacher:
+        return JsonResponse({'error': 'ليس لديك صلاحية لتعديل هذا الدرس'}, status=403)
+
+    try:
+        data = _json.loads(request.body)
+        paragraph_index = int(data.get('paragraph_index', 0))
+        question = data.get('question', '').strip()
+        option_a = data.get('option_a', '').strip()
+        option_b = data.get('option_b', '').strip()
+        correct_answer = data.get('correct_answer', '').strip().upper()
+
+        if not question or not option_a or not option_b:
+            return JsonResponse({'error': 'يجب ملء السؤال والخيارين'}, status=400)
+        if correct_answer not in ['A', 'B']:
+            return JsonResponse({'error': 'الإجابة الصحيحة يجب أن تكون A أو B'}, status=400)
+
+        checkpoint, created = Checkpoint.objects.update_or_create(
+            lessonid=lesson,
+            paragraph_index=paragraph_index,
+            defaults={
+                'question': question,
+                'option_a': option_a,
+                'option_b': option_b,
+                'correct_answer': correct_answer,
+            }
+        )
+
+        return JsonResponse({
+            'ok': True,
+            'checkpoint_id': checkpoint.checkpointid,
+            'created': created,
+            'message': 'تم حفظ نقطة التحقق بنجاح'
+        })
+    except Exception as e:
+        logger.error(f'checkpoint_create error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def checkpoint_update(request, checkpoint_id):
+    """تحديث نقطة تحقق موجودة"""
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role = getattr(request.user, 'userrole', None)
+
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+
+    checkpoint = get_object_or_404(Checkpoint, pk=checkpoint_id)
+    teacher = Teacher.objects.filter(userid=request.user).first()
+
+    if teacher and checkpoint.lessonid.teacherid != teacher:
+        return JsonResponse({'error': 'ليس لديك صلاحية لتعديل هذه النقطة'}, status=403)
+
+    try:
+        data = _json.loads(request.body)
+        if 'question' in data:
+            checkpoint.question = data['question'].strip()
+        if 'option_a' in data:
+            checkpoint.option_a = data['option_a'].strip()
+        if 'option_b' in data:
+            checkpoint.option_b = data['option_b'].strip()
+        if 'correct_answer' in data:
+            correct = data['correct_answer'].strip().upper()
+            if correct not in ['A', 'B']:
+                return JsonResponse({'error': 'الإجابة الصحيحة يجب أن تكون A أو B'}, status=400)
+            checkpoint.correct_answer = correct
+
+        checkpoint.save()
+        return JsonResponse({'ok': True, 'message': 'تم تحديث نقطة التحقق بنجاح'})
+    except Exception as e:
+        logger.error(f'checkpoint_update error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def checkpoint_delete(request, checkpoint_id):
+    """حذف نقطة تحقق"""
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role = getattr(request.user, 'userrole', None)
+
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+
+    checkpoint = get_object_or_404(Checkpoint, pk=checkpoint_id)
+    teacher = Teacher.objects.filter(userid=request.user).first()
+
+    if teacher and checkpoint.lessonid.teacherid != teacher:
+        return JsonResponse({'error': 'ليس لديك صلاحية لحذف هذه النقطة'}, status=403)
+
+    checkpoint.delete()
+    return JsonResponse({'ok': True, 'message': 'تم حذف نقطة التحقق بنجاح'})
+
+
+@login_required
+def checkpoint_list(request, lesson_id):
+    """جلب جميع نقاط التحقق لدرس معين"""
+    lesson = get_object_or_404(Lessoncontent, pk=lesson_id)
+    teacher = Teacher.objects.filter(userid=request.user).first()
+
+    # التحقق من الصلاحية
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role = getattr(request.user, 'userrole', None)
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+    if teacher and lesson.teacherid != teacher:
+        return JsonResponse({'error': 'ليس لديك صلاحية لعرض هذه النقاط'}, status=403)
+
+    checkpoints = Checkpoint.objects.filter(lessonid=lesson).order_by('paragraph_index')
+    checkpoint_data = []
+    for cp in checkpoints:
+        checkpoint_data.append({
+            'checkpoint_id': cp.checkpointid,
+            'paragraph_index': cp.paragraph_index,
+            'question': cp.question,
+            'option_a': cp.option_a,
+            'option_b': cp.option_b,
+            'correct_answer': cp.correct_answer,
+        })
+
+    return JsonResponse({'ok': True, 'checkpoints': checkpoint_data})
+
+
+@login_required
+@require_POST
+def student_checkpoint_answer(request):
+    """حفظ إجابة الطالب على نقطة تحقق"""
+    role = getattr(request.user, 'userrole', None)
+    if role != ROLE_STUDENT:
+        return JsonResponse({'error': 'هذه الخاصية للطلاب فقط'}, status=403)
+
+    student = Student.objects.filter(userid=request.user).first()
+    if not student:
+        return JsonResponse({'error': 'الطالب غير موجود'}, status=404)
+
+    try:
+        data = _json.loads(request.body)
+        checkpoint_id = data.get('checkpoint_id')
+        selected_answer = data.get('selected_answer', '').strip().upper()
+        session_id = data.get('session_id')
+        response_time = data.get('response_time')
+
+        if not checkpoint_id:
+            return JsonResponse({'error': 'يجب تحديد نقطة التحقق'}, status=400)
+        if selected_answer not in ['A', 'B']:
+            return JsonResponse({'error': 'الإجابة يجب أن تكون A أو B'}, status=400)
+
+        checkpoint = get_object_or_404(Checkpoint, pk=checkpoint_id)
+        session = None
+        if session_id:
+            try:
+                session = Learningsession.objects.get(pk=session_id, studentid=student)
+            except Learningsession.DoesNotExist:
+                pass
+
+        # حفظ الإجابة مع المدة الزمنية
+        StudentCheckpointAnswer.objects.update_or_create(
+            checkpoint=checkpoint,
+            studentid=student,
+            sessionid=session,
+            defaults={
+                'selected_answer': selected_answer,
+                'response_time': response_time
+            }
+        )
+
+        return JsonResponse({'ok': True, 'message': 'تم حفظ الإجابة'})
+    except Exception as e:
+        logger.error(f'student_checkpoint_answer error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def checkpoint_results(request, lesson_id):
+    """عرض نتائج نقاط التحقق للمعلم"""
+    is_admin = request.user.is_staff or request.user.is_superuser
+    role = getattr(request.user, 'userrole', None)
+
+    if not is_admin and role not in (ROLE_TEACHER, ROLE_ADMIN):
+        return JsonResponse({'error': 'غير مصرح'}, status=403)
+
+    lesson = get_object_or_404(Lessoncontent, pk=lesson_id)
+    teacher = Teacher.objects.filter(userid=request.user).first()
+
+    if teacher and lesson.teacherid != teacher:
+        return JsonResponse({'error': 'ليس لديك صلاحية لعرض هذه النتائج'}, status=403)
+
+    checkpoints = Checkpoint.objects.filter(lessonid=lesson).order_by('paragraph_index')
+    results = []
+
+    for cp in checkpoints:
+        answers = StudentCheckpointAnswer.objects.filter(checkpoint=cp).select_related('studentid__userid')
+        answer_data = []
+        for ans in answers:
+            is_correct = (ans.selected_answer == cp.correct_answer)
+            answer_data.append({
+                'student_name': ans.studentid.userid.fullname,
+                'selected_answer': ans.selected_answer,
+                'is_correct': is_correct,
+                'answered_at': ans.answered_at.strftime('%Y-%m-%d %H:%M') if ans.answered_at else None,
+                'response_time': ans.response_time,
+            })
+
+        results.append({
+            'checkpoint_id': cp.checkpointid,
+            'paragraph_index': cp.paragraph_index,
+            'question': cp.question,
+            'correct_answer': cp.correct_answer,
+            'total_answers': len(answer_data),
+            'correct_count': sum(1 for a in answer_data if a['is_correct']),
+            'answers': answer_data,
+        })
+
+    return render(request, 'learning/checkpoint_results.html', {
+        'lesson': lesson,
+        'results': results,
+    })
+
 
 @login_required
 def activate_ai(request):

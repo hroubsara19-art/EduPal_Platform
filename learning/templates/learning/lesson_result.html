@@ -143,6 +143,10 @@
             <span id="sprev-text">معاينة كما يراها الطالب</span>
           </button>
           {% endif %}
+          <a href="{% url 'learning:checkpoint_results' lesson.pk %}" class="lr-btn lr-btn-outline w-100" style="font-size:.85rem;text-decoration:none;">
+            <i class="fas fa-chart-bar"></i>
+            <span>نتائج نقاط التحقق</span>
+          </a>
         </div>
       </div>
 
@@ -265,6 +269,56 @@
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:.75rem;">
       <button onclick="closeImgPick()" class="lr-btn lr-btn-ghost" style="font-size:.85rem;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Modal: إضافة/تعديل نقطة تحقق -->
+<div class="lr-checkpoint-modal d-none" id="checkpointModal">
+  <div class="lr-checkpoint-backdrop" onclick="closeCheckpointModal()"></div>
+  <div class="lr-checkmodal-box">
+    <h5 class="lr-checkmodal-title" id="checkpointModalTitle"><i class="fas fa-question-circle"></i> إضافة نقطة تحقق</h5>
+    <div id="checkpointSaveStatus" class="lr-checkform-status" style="display:none;"></div>
+    <div class="lr-checkform-group">
+      <label class="lr-checkform-label">السؤال</label>
+      <input type="text" id="checkpointQuestion" class="lr-checkform-input" placeholder="اكتب سؤالاً قصيراً للفقرة..." maxlength="500">
+    </div>
+    <div class="lr-checkform-row">
+      <div class="lr-checkform-group">
+        <label class="lr-checkform-label">الخيار الأول</label>
+        <input type="text" id="checkpointOptionA" class="lr-checkform-input" placeholder="الخيار الأول" maxlength="300">
+      </div>
+      <div class="lr-checkform-group">
+        <label class="lr-checkform-label">الخيار الثاني</label>
+        <input type="text" id="checkpointOptionB" class="lr-checkform-input" placeholder="الخيار الثاني" maxlength="300">
+      </div>
+    </div>
+    <div class="lr-checkform-group">
+      <label class="lr-checkform-label">الإجابة الصحيحة (للمعلم فقط)</label>
+      <select id="checkpointCorrectAnswer" class="lr-checkform-input">
+        <option value="A">الخيار الأول</option>
+        <option value="B">الخيار الثاني</option>
+      </select>
+    </div>
+    <div class="lr-checkmodal-actions">
+      <button type="button" class="lr-btn lr-btn-ghost" onclick="closeCheckpointModal()">إلغاء</button>
+      <button type="button" class="lr-btn lr-btn-primary" onclick="saveCheckpoint()">حفظ نقطة التحقق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Modal: تأكيد الحذف -->
+<div class="lr-checkpoint-modal d-none" id="deleteConfirmModal">
+  <div class="lr-checkpoint-backdrop" onclick="closeDeleteConfirmModal()"></div>
+  <div class="lr-checkmodal-box">
+    <h5 class="lr-checkmodal-title" style="color:var(--red);"><i class="fas fa-exclamation-triangle"></i> تأكيد الحذف</h5>
+    <div id="deleteConfirmStatus" class="lr-checkform-status" style="display:none;"></div>
+    <p style="font-family:'Tajawal',sans-serif;font-size:.95rem;color:var(--ink);margin-bottom:1.5rem;">
+      هل أنت متأكد من حذف نقطة التحقق؟ لا يمكن التراجع عن هذا الإجراء.
+    </p>
+    <div class="lr-checkmodal-actions">
+      <button type="button" class="lr-btn lr-btn-ghost" onclick="closeDeleteConfirmModal()" style="font-size:.85rem;">إلغاء</button>
+      <button type="button" class="lr-btn lr-btn-primary" onclick="confirmDeleteCheckpoint()" style="background:var(--red);border-color:var(--red);font-size:.85rem;">نعم، احذف</button>
     </div>
   </div>
 </div>
@@ -424,6 +478,34 @@ body{background:var(--bg);font-family:'Cairo','Tajawal',sans-serif;color:var(--i
 .img-pick-item:hover{border-color:var(--blue);}
 .img-pick-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block;}
 .img-pick-item span{display:block;font-family:'Cairo',sans-serif;font-size:.75rem;font-weight:700;padding:.3rem;background:var(--blue-xlt);color:var(--blue-dk);}
+/* Checkpoint styles */
+.lr-para-checkpoint{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--blue-xlt);border:1.5px solid var(--blue-bd);border-radius:.6rem;margin-top:.75rem;font-family:'Tajawal',sans-serif;font-size:.82rem;color:var(--blue-dk);}
+.lr-para-checkpoint-has{background:#ecfdf5;border-color:#10b981;color:#065f46;}
+.lr-para-checkpoint-has i{color:#10b981;}
+.lr-checkpoint-add{background:var(--blue-lt);color:var(--blue);border:1.5px solid var(--blue-bd);}
+.lr-checkpoint-add:hover{background:var(--blue);color:#fff;}
+.lr-checkpoint-edit{background:var(--white);border:1px solid var(--border);color:var(--muted);border-radius:.4rem;padding:.2rem .5rem;font-size:.75rem;cursor:pointer;transition:all .15s;margin-right:auto;}
+.lr-checkpoint-edit:hover{background:var(--blue-lt);color:var(--blue);border-color:var(--blue-bd);}
+.lr-checkpoint-delete{background:var(--white);border:1px solid #fca5a5;color:var(--red);border-radius:.4rem;padding:.2rem .5rem;font-size:.75rem;cursor:pointer;transition:all .15s;}
+.lr-checkpoint-delete:hover{background:var(--red-lt);border-color:var(--red-md);}
+/* Checkpoint modal */
+.lr-checkpoint-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;}
+.lr-checkpoint-modal.d-none{display:none!important;}
+.lr-checkpoint-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);}
+.lr-checkmodal-box{position:relative;z-index:1;background:var(--white);border-radius:1.25rem;padding:2rem;max-width:500px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);}
+.lr-checkmodal-title{font-family:'Cairo',sans-serif;font-size:1.15rem;font-weight:800;margin-bottom:1.25rem;color:var(--ink);display:flex;align-items:center;gap:.5rem;}
+.lr-checkmodal-title i{color:var(--blue);}
+.lr-checkform-group{margin-bottom:1rem;}
+.lr-checkform-label{display:block;font-family:'Cairo',sans-serif;font-size:.85rem;font-weight:700;color:var(--ink);margin-bottom:.4rem;}
+.lr-checkform-input{width:100%;border:1.5px solid var(--border);border-radius:.6rem;padding:.6rem .8rem;font-family:'Tajawal',sans-serif;font-size:.9rem;color:var(--ink);direction:rtl;text-align:right;outline:none;transition:border-color .2s;}
+.lr-checkform-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(29,78,216,.08);}
+.lr-checkform-row{display:flex;gap:.75rem;}
+.lr-checkform-row .lr-checkform-group{flex:1;}
+.lr-checkform-status{padding:.75rem 1rem;border-radius:.6rem;margin-bottom:1rem;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:600;display:flex;align-items:center;gap:.5rem;}
+.lr-checkform-status.success{background:#ecfdf5;border:1px solid #10b981;color:#065f46;}
+.lr-checkform-status.error{background:#fef2f2;border:1px solid #ef4444;color:#991b1b;}
+.lr-checkform-status.loading{background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;}
+.lr-checkmodal-actions{display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem;}
 @media(max-width:768px){.lr-layout{grid-template-columns:1fr;}.lr-header{flex-direction:column;}.lr-header-actions{width:100%;}}
 </style>
 
@@ -432,11 +514,13 @@ body{background:var(--bg);font-family:'Cairo','Tajawal',sans-serif;color:var(--i
 {{ image_list|default:"[]"|json_script:"dj-image-list" }}
 {{ timing_url|default:""|json_script:"dj-timing-url" }}
 {{ audio_url|default:""|json_script:"dj-audio-url" }}
+{{ checkpoints|default:"[]"|json_script:"dj-checkpoints" }}
 
 <script>
 var rawText    = JSON.parse(document.getElementById('dj-raw-text').textContent   || '""');
 var IMAGE_LIST = JSON.parse(document.getElementById('dj-image-list').textContent || '[]');
 var AUDIO_URL  = JSON.parse(document.getElementById('dj-audio-url').textContent  || '""');
+var CHECKPOINTS = JSON.parse(document.getElementById('dj-checkpoints').textContent || '[]');
 var TIMING_URL = (function(){
     try {
         var el  = document.getElementById('dj-timing-url');
@@ -449,17 +533,80 @@ var TIMING_URL = (function(){
 
 var paragraphs = [];
 var paraImages = {};
+var checkpointsMap = {}; // Map paragraph index to checkpoint data
 var dragSrcIdx = null;
 var _pickingParaIdx = null;
 var _uploadUrl = "{% url 'learning:upload_para_image' lesson.pk %}";
 var _csrf      = "{{ csrf_token }}";
+var LESSON_ID  = parseInt("{{ lesson.pk|escapejs }}") || 0;
+var _editingCheckpointIdx = null;
+var _deletingCheckpointIdx = null;
+var _checkpointCreateUrl = "{% url 'learning:checkpoint_create' lesson.pk %}";
+var _checkpointUpdateUrlBase = "{% url 'learning:checkpoint_update' 0 %}";
+var _checkpointDeleteUrlBase = "{% url 'learning:checkpoint_delete' 0 %}";
 
-(function init(){
-    var lines = rawText ? rawText.split(/\n\s*\n/).map(function(p){ return p.trim(); }).filter(Boolean) : [];
-    paragraphs = lines.length ? lines : [''];
+function init(){
+    console.log('[DEBUG] init() started...');
+
+    // 1. محاولة استرجاع البيانات مع التحقق من الوجود
+    var rawEl = document.getElementById('dj-raw-text');
+    var rawVal = rawEl ? rawEl.textContent : '""';
+
+    try {
+        rawText = JSON.parse(rawVal || '""');
+    } catch(e) {
+        console.log('[DEBUG] JSON parse error:', e);
+        rawText = "";
+    }
+
+    console.log('[DEBUG] rawText:', rawText);
+    console.log('[DEBUG] rawText length:', rawText ? rawText.length : 0);
+    console.log('[DEBUG] rawText type:', typeof rawText);
+
+    // 2. تقسيم النص مع معالجة أفضل للفراغات
+    var lines = [];
+    if (typeof rawText === 'string' && rawText.trim()) {
+        // تقسيم احترافي يعالج تعدد الأسطر
+        lines = rawText.split(/\n\s*\n/).map(function(p){ return p.trim(); }).filter(Boolean);
+        console.log('[DEBUG] After double newline split:', lines.length, 'lines');
+        if (lines.length === 0) {
+            lines = rawText.split(/\n/).map(function(p){ return p.trim(); }).filter(Boolean);
+            console.log('[DEBUG] After single newline split:', lines.length, 'lines');
+        }
+    }
+
+    // 3. التعيين المباشر (تجنب التكرار غير الضروري)
+    paragraphs = (lines.length > 0) ? lines : ['اكتب نص الفقرة هنا...'];
+    console.log('[DEBUG] Final paragraphs count:', paragraphs.length);
+    console.log('[DEBUG] paragraphs:', paragraphs);
+
+    // 4. بناء الـ Maps المطلوبة قبل الرسم
+    paraImages = {};
     paragraphs.forEach(function(_, i){ if (IMAGE_LIST[i]) paraImages[i] = IMAGE_LIST[i]; });
+
+    checkpointsMap = {};
+    if (Array.isArray(CHECKPOINTS)) {
+        CHECKPOINTS.forEach(function(cp){
+            checkpointsMap[cp.paragraph_index] = cp;
+        });
+    }
+    console.log('[DEBUG] checkpointsMap:', checkpointsMap);
+
+    // 5. الرسم المضمون
     renderParagraphs();
-})();
+}
+
+// استدعاء init() بعد تحميل DOM بالكامل
+document.addEventListener('DOMContentLoaded', function(){
+    console.log('[DEBUG] DOMContentLoaded fired');
+    init();
+});
+
+// التأكد من استدعاء init حتى لو تأخر DOMContentLoaded
+if (document.readyState === "complete" || document.readyState === "interactive") {
+    console.log('[DEBUG] Document already ready, calling init() directly');
+    init();
+}
 
 function renderParagraphs() {
     var container = document.getElementById('paragraphsContainer');
@@ -473,7 +620,14 @@ function renderParagraphs() {
         var imgSection = imgUrl
             ? '<div class="lr-para-img"><img src="' + escHtml(imgUrl) + '" class="lr-para-img-thumb" onclick="window.open(\'' + escHtml(imgUrl) + '\',\'_blank\')" title="عرض الصورة كاملة"><div class="lr-para-img-info">صورة الفقرة ' + (i+1) + '</div><div class="lr-para-img-btns"><button class="lr-para-img-change" onclick="openImgPick(' + i + ')" type="button"><i class="fas fa-exchange-alt"></i> تغيير</button><button class="lr-para-img-remove" onclick="removeParaImg(' + i + ')" type="button"><i class="fas fa-times"></i></button></div></div>'
             : '<button type="button" class="lr-tool-btn" style="font-size:.78rem;padding:.3rem .7rem;margin-top:.5rem;" onclick="openImgPick(' + i + ')"><i class="fas fa-image"></i> إضافة صورة</button>';
-        block.innerHTML = '<div class="lr-para-head"><i class="fas fa-grip-vertical lr-para-drag"></i><div class="lr-para-num">' + (i+1) + '</div><div class="lr-para-label">الفقرة ' + (i+1) + '</div><button type="button" class="lr-para-del" onclick="deleteParagraph(' + i + ')"><i class="fas fa-times"></i></button></div><div class="lr-para-body"><textarea class="lr-para-textarea" rows="4" data-para-idx="' + i + '">' + escHtml(text) + '</textarea>' + imgSection + '</div>';
+
+        // Checkpoint section
+        var checkpoint = checkpointsMap[i];
+        var checkpointSection = checkpoint
+            ? '<div class="lr-para-checkpoint lr-para-checkpoint-has"><i class="fas fa-check-circle"></i> نقطة تحقق مضافة <button type="button" class="lr-checkpoint-edit" onclick="openCheckpointModal(' + i + ')"><i class="fas fa-edit"></i> تعديل</button><button type="button" class="lr-checkpoint-delete" onclick="deleteCheckpoint(' + i + ')"><i class="fas fa-trash"></i></button></div>'
+            : '<button type="button" class="lr-tool-btn lr-checkpoint-add" style="font-size:.78rem;padding:.3rem .7rem;margin-top:.5rem;" onclick="openCheckpointModal(' + i + ')"><i class="fas fa-question-circle"></i> إضافة نقطة تحقق</button>';
+
+        block.innerHTML = '<div class="lr-para-head"><i class="fas fa-grip-vertical lr-para-drag"></i><div class="lr-para-num">' + (i+1) + '</div><div class="lr-para-label">الفقرة ' + (i+1) + '</div><button type="button" class="lr-para-del" onclick="deleteParagraph(' + i + ')"><i class="fas fa-times"></i></button></div><div class="lr-para-body"><textarea class="lr-para-textarea" rows="4" data-para-idx="' + i + '">' + escHtml(text) + '</textarea>' + imgSection + checkpointSection + '</div>';
         block.querySelector('textarea').addEventListener('input', function(){ paragraphs[parseInt(this.dataset.paraIdx)] = this.value; _refreshPreviewIfOpen(); });
         block.addEventListener('dragstart', function(e){ dragSrcIdx = i; block.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
         block.addEventListener('dragend',   function(){ block.classList.remove('dragging'); document.querySelectorAll('.lr-para-block').forEach(function(b){ b.classList.remove('drag-over'); }); });
@@ -553,6 +707,166 @@ function handleImgUpload(event){
         else{statusEl.textContent='❌ '+(d.error||'خطأ في الرفع');statusEl.style.color='#dc2626';}
     })
     .catch(function(){statusEl.textContent='❌ تعذّر الاتصال بالخادم';statusEl.style.color='#dc2626';});
+}
+
+/* ✅ Checkpoint Management Functions */
+function openCheckpointModal(paraIdx){
+    _editingCheckpointIdx = paraIdx;
+    var checkpoint = checkpointsMap[paraIdx];
+    var modal = document.getElementById('checkpointModal');
+    var title = document.getElementById('checkpointModalTitle');
+
+    if(checkpoint){
+        title.innerHTML = '<i class="fas fa-edit"></i> تعديل نقطة التحقق';
+        document.getElementById('checkpointQuestion').value = checkpoint.question || '';
+        document.getElementById('checkpointOptionA').value = checkpoint.option_a || '';
+        document.getElementById('checkpointOptionB').value = checkpoint.option_b || '';
+        document.getElementById('checkpointCorrectAnswer').value = checkpoint.correct_answer || 'A';
+    }else{
+        title.innerHTML = '<i class="fas fa-question-circle"></i> إضافة نقطة تحقق';
+        document.getElementById('checkpointQuestion').value = '';
+        document.getElementById('checkpointOptionA').value = '';
+        document.getElementById('checkpointOptionB').value = '';
+        document.getElementById('checkpointCorrectAnswer').value = 'A';
+    }
+
+    modal.classList.remove('d-none');
+}
+
+function closeCheckpointModal(){
+    document.getElementById('checkpointModal').classList.add('d-none');
+    _editingCheckpointIdx = null;
+}
+
+function saveCheckpoint(){
+    if(_editingCheckpointIdx === null) return;
+
+    var question = document.getElementById('checkpointQuestion').value.trim();
+    var optionA = document.getElementById('checkpointOptionA').value.trim();
+    var optionB = document.getElementById('checkpointOptionB').value.trim();
+    var correctAnswer = document.getElementById('checkpointCorrectAnswer').value;
+    var statusEl = document.getElementById('checkpointSaveStatus');
+
+    if(!question || !optionA || !optionB){
+        statusEl.textContent = 'يجب ملء السؤال والخيارين';
+        statusEl.className = 'lr-checkform-status error';
+        statusEl.style.display = 'flex';
+        return;
+    }
+
+    // Show loading status
+    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+    statusEl.className = 'lr-checkform-status loading';
+    statusEl.style.display = 'flex';
+
+    var data = {
+        paragraph_index: _editingCheckpointIdx,
+        question: question,
+        option_a: optionA,
+        option_b: optionB,
+        correct_answer: correctAnswer
+    };
+
+    var url = _checkpointCreateUrl;
+    var existingCheckpoint = checkpointsMap[_editingCheckpointIdx];
+    if(existingCheckpoint){
+        url = _checkpointUpdateUrlBase.replace('0', existingCheckpoint.checkpoint_id);
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': _csrf
+        },
+        body: JSON.stringify(data)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if(d.ok){
+            checkpointsMap[_editingCheckpointIdx] = {
+                checkpoint_id: d.checkpoint_id || existingCheckpoint.checkpoint_id,
+                paragraph_index: _editingCheckpointIdx,
+                question: question,
+                option_a: optionA,
+                option_b: optionB,
+                correct_answer: correctAnswer
+            };
+            renderParagraphs();
+            statusEl.innerHTML = '<i class="fas fa-check-circle"></i> تم حفظ نقطة التحقق بنجاح';
+            statusEl.className = 'lr-checkform-status success';
+            // Close modal after short delay
+            setTimeout(function(){
+                closeCheckpointModal();
+                statusEl.style.display = 'none';
+            }, 1500);
+        }else{
+            statusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> خطأ: ' + (d.error || 'حدث خطأ أثناء الحفظ');
+            statusEl.className = 'lr-checkform-status error';
+        }
+    })
+    .catch(function(){
+        statusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> تعذّر الاتصال بالخادم';
+        statusEl.className = 'lr-checkform-status error';
+    });
+}
+
+function deleteCheckpoint(paraIdx){
+    var checkpoint = checkpointsMap[paraIdx];
+    if(!checkpoint) return;
+
+    _deletingCheckpointIdx = paraIdx;
+    var modal = document.getElementById('deleteConfirmModal');
+    var statusEl = document.getElementById('deleteConfirmStatus');
+    statusEl.style.display = 'none';
+    modal.classList.remove('d-none');
+}
+
+function closeDeleteConfirmModal(){
+    document.getElementById('deleteConfirmModal').classList.add('d-none');
+    _deletingCheckpointIdx = null;
+}
+
+function confirmDeleteCheckpoint(){
+    if(_deletingCheckpointIdx === null) return;
+
+    var checkpoint = checkpointsMap[_deletingCheckpointIdx];
+    if(!checkpoint) return;
+
+    var statusEl = document.getElementById('deleteConfirmStatus');
+
+    // Show loading status
+    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحذف...';
+    statusEl.className = 'lr-checkform-status loading';
+    statusEl.style.display = 'flex';
+
+    fetch(_checkpointDeleteUrlBase.replace('0', checkpoint.checkpoint_id), {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': _csrf
+        }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if(d.ok){
+            delete checkpointsMap[_deletingCheckpointIdx];
+            renderParagraphs();
+            statusEl.innerHTML = '<i class="fas fa-check-circle"></i> تم حذف نقطة التحقق بنجاح';
+            statusEl.className = 'lr-checkform-status success';
+            // Close modal after short delay
+            setTimeout(function(){
+                closeDeleteConfirmModal();
+                statusEl.style.display = 'none';
+            }, 1500);
+        }else{
+            statusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> خطأ: ' + (d.error || 'حدث خطأ أثناء الحذف');
+            statusEl.className = 'lr-checkform-status error';
+        }
+    })
+    .catch(function(){
+        statusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> تعذّر الاتصال بالخادم';
+        statusEl.className = 'lr-checkform-status error';
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -657,7 +971,11 @@ function syncTextareas(){
 
 function submitPublish(){syncTextareas();document.getElementById('publishModal').classList.remove('d-none');}
 function closeModal(){document.getElementById('publishModal').classList.add('d-none');}
-function confirmPublish(){document.getElementById('finalText').value=paragraphs.join('\n\n');closeModal();document.getElementById('publishForm').submit();}
+function confirmPublish(){
+    document.getElementById('finalText').value=paragraphs.join('\n\n');
+    closeModal();
+    document.getElementById('publishForm').submit();
+}
 
 function saveLesson(){
     syncTextareas();

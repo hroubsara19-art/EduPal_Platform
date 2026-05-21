@@ -188,6 +188,43 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
     backface-visibility: hidden;
     perspective: 1000px;
   }
+
+  /* Checkpoint popup styles */
+  .checkpoint-popup{
+    position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;
+  }
+  .checkpoint-popup.d-none{display:none!important;}
+  .checkpoint-backdrop{
+    position:absolute;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);
+  }
+  .checkpoint-box{
+    position:relative;z-index:1;background:#fff;border-radius:1.25rem;padding:2rem;
+    max-width:480px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.2);
+  }
+  .checkpoint-title{
+    font-family:'Cairo',sans-serif;font-size:1.1rem;font-weight:800;margin-bottom:1.25rem;
+    color:#1e293b;display:flex;align-items:center;gap:.5rem;
+  }
+  .checkpoint-title i{color:#3b82f6;}
+  .checkpoint-question{
+    font-family:'Tajawal',sans-serif;font-size:1rem;font-weight:700;
+    color:#1e293b;margin-bottom:1.25rem;line-height:1.6;
+  }
+  .checkpoint-options{display:flex;flex-direction:column;gap:.75rem;}
+  .checkpoint-option{
+    padding:.85rem 1rem;border:2px solid #e2e8f0;border-radius:10px;
+    font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:600;color:#1e293b;
+    cursor:pointer;transition:all .2s;text-align:right;
+  }
+  .checkpoint-option:hover{
+    border-color:#3b82f6;background:#eff6ff;
+  }
+  .checkpoint-option.selected{
+    border-color:#3b82f6;background:#eff6ff;
+  }
+  .checkpoint-actions{
+    display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem;
+  }
   </style>
 {% endblock %}
 
@@ -237,7 +274,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   </div>
   {% endif %}
 
-  {% if lesson.ai_generatedtext %}
+  {% if lesson.ai_generatedtext or lesson.originaltext %}
   <div class="lesson-card">
     <div class="lesson-card-cover" id="lesson-card-cover">
       <div class="lesson-card-cover-overlay"></div>
@@ -269,6 +306,19 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   </div>
 </div>
 
+<!-- Checkpoint popup -->
+<div class="checkpoint-popup d-none" id="checkpointPopup">
+  <div class="checkpoint-backdrop"></div>
+  <div class="checkpoint-box">
+    <h5 class="checkpoint-title" id="checkpointTitle"><i class="fas fa-question-circle"></i> نقطة تحقق</h5>
+    <div class="checkpoint-question" id="checkpointQuestion"></div>
+    <div class="checkpoint-options">
+      <button type="button" class="checkpoint-option" id="checkpointOptionA" onclick="selectCheckpointAnswer('A')"></button>
+      <button type="button" class="checkpoint-option" id="checkpointOptionB" onclick="selectCheckpointAnswer('B')"></button>
+    </div>
+  </div>
+</div>
+
 {% include 'student_app/chatbot_widget.html' %}
 
 <div id="alert-toast" style="position:fixed;bottom:2rem;right:50%;transform:translateX(50%);
@@ -278,13 +328,14 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 {% endblock %}
 
 {% block extra_js %}
-{{  lesson.ai_generatedtext|default:''|json_script:"dj-lesson-text" }}
+{{ lesson.ai_generatedtext|default:lesson.originaltext|default:''|json_script:"dj-lesson-text" }}
 {{ image_list|default:"[]"|json_script:"dj-image-list" }}
 {{ lesson_id|json_script:"dj-lesson-id" }}
 {{ session_id|json_script:"dj-session-id" }}
 {{ student.daily_chat_limit|default:20|json_script:"dj-chat-limit" }}
 {{ student.chats_today|default:0|json_script:"dj-chat-used" }}
 {{ words_json_url|default:''|json_script:"dj-words-json-url" }}
+{{ checkpoints|default:"[]"|json_script:"dj-checkpoints" }}
 
 <script>
 
@@ -294,6 +345,17 @@ var CSRF_TOKEN = "{{ csrf_token }}";
 var CHAT_URL   = "{% url 'student:lesson_chat' lesson.pk %}";
 var CHAT_LIMIT = JSON.parse(document.getElementById('dj-chat-limit').textContent);
 var CHAT_USED  = JSON.parse(document.getElementById('dj-chat-used').textContent);
+
+// Checkpoint data
+var CHECKPOINTS = JSON.parse(document.getElementById('dj-checkpoints').textContent || '[]');
+var checkpointsMap = {};
+CHECKPOINTS.forEach(function(cp){
+  checkpointsMap[cp.paragraph_index] = cp;
+});
+var currentCheckpoint = null;
+var audioPausedForCheckpoint = false;
+var checkpointAnswered = {};
+var checkpointStartTime = null;
 
 
 var TIMING_URL = (function(){
@@ -1337,8 +1399,119 @@ function handleForceStop(studentName) {
 
 function setSpeed(s, btn){
     var a = document.getElementById('topAudio'); if (a) a.playbackRate = s;
-    btn.closest('.audio-speeds').querySelectorAll('.spd-btn').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
+    var btns = document.querySelectorAll('.spd-btn');
+    btns.forEach(function(b){ b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Checkpoint Management Functions
+// ══════════════════════════════════════════════════════════════
+function onParagraphEnd(paraIndex) {
+    console.log('[Checkpoint] Paragraph ended:', paraIndex);
+
+    // Check if this paragraph has a checkpoint
+    var checkpoint = checkpointsMap[paraIndex];
+    if (!checkpoint) {
+        console.log('[Checkpoint] No checkpoint for paragraph:', paraIndex);
+        return;
+    }
+
+    // Check if checkpoint already answered
+    if (checkpointAnswered[paraIndex]) {
+        console.log('[Checkpoint] Already answered for paragraph:', paraIndex);
+        return;
+    }
+
+    // Show checkpoint popup
+    showCheckpointPopup(checkpoint);
+}
+
+function showCheckpointPopup(checkpoint) {
+    console.log('[Checkpoint] Showing popup for checkpoint:', checkpoint);
+
+    currentCheckpoint = checkpoint;
+    checkpointStartTime = Date.now(); // Record start time
+
+    // Set popup content
+    document.getElementById('checkpointQuestion').textContent = checkpoint.question;
+    document.getElementById('checkpointOptionA').textContent = checkpoint.option_a;
+    document.getElementById('checkpointOptionB').textContent = checkpoint.option_b;
+
+    // Show popup
+    var popup = document.getElementById('checkpointPopup');
+    popup.classList.remove('d-none');
+
+    // Pause audio
+    var audio = document.getElementById('topAudio');
+    if (audio && !audio.paused) {
+        audio.pause();
+        audioPausedForCheckpoint = true;
+    }
+}
+
+function closeCheckpointPopup() {
+    console.log('[Checkpoint] Closing popup');
+
+    var popup = document.getElementById('checkpointPopup');
+    popup.classList.add('d-none');
+
+    currentCheckpoint = null;
+
+    // Resume audio if it was paused for checkpoint
+    if (audioPausedForCheckpoint) {
+        var audio = document.getElementById('topAudio');
+        if (audio && audio.paused) {
+            audio.play();
+        }
+        audioPausedForCheckpoint = false;
+    }
+}
+
+function selectCheckpointAnswer(answer) {
+    console.log('[Checkpoint] Answer selected:', answer);
+
+    if (!currentCheckpoint) return;
+
+    // Calculate response time in seconds
+    var responseTime = 0;
+    if (checkpointStartTime) {
+        responseTime = (Date.now() - checkpointStartTime) / 1000; // Convert to seconds
+    }
+
+    // Mark checkpoint as answered
+    checkpointAnswered[currentCheckpoint.paragraph_index] = true;
+
+    // Save answer to server with response time
+    saveCheckpointAnswer(currentCheckpoint.checkpoint_id, answer, responseTime);
+
+    // Close popup without showing result
+    closeCheckpointPopup();
+}
+
+function saveCheckpointAnswer(checkpointId, answer, responseTime) {
+    console.log('[Checkpoint] Saving answer:', checkpointId, answer, 'Response time:', responseTime + 's');
+
+    fetch("{% url 'learning:student_checkpoint_answer' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({
+            checkpoint_id: checkpointId,
+            selected_answer: answer,
+            session_id: SESSION_ID,
+            response_time: responseTime
+        })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        console.log('[Checkpoint] Answer saved:', d);
+    })
+    .catch(function(e){
+        console.error('[Checkpoint] Error saving answer:', e);
+    });
 }
 
 function pauseTracking(){
@@ -1551,6 +1724,84 @@ window.addEventListener('beforeunload', function(){
         }, 500);
     }
 })();
+
+/* Checkpoint Functions */
+function showCheckpointPopup(paraIdx){
+  var checkpoint = checkpointsMap[paraIdx];
+  if(!checkpoint) return;
+  
+  currentCheckpoint = checkpoint;
+  document.getElementById('checkpointQuestion').textContent = checkpoint.question;
+  document.getElementById('checkpointOptionA').textContent = checkpoint.option_a;
+  document.getElementById('checkpointOptionB').textContent = checkpoint.option_b;
+  
+  // Pause audio if playing
+  var audio = document.getElementById('topAudio');
+  if(audio && !audio.paused){
+    audio.pause();
+    audioPausedForCheckpoint = true;
+  }
+  
+  document.getElementById('checkpointPopup').classList.remove('d-none');
+}
+
+function hideCheckpointPopup(){
+  document.getElementById('checkpointPopup').classList.add('d-none');
+  currentCheckpoint = null;
+  
+  // Resume audio if it was paused
+  var audio = document.getElementById('topAudio');
+  if(audio && audioPausedForCheckpoint){
+    audio.play();
+    audioPausedForCheckpoint = false;
+  }
+}
+
+function selectCheckpointAnswer(answer){
+  if(!currentCheckpoint) return;
+
+  // Mark selected option visually
+  document.querySelectorAll('.checkpoint-option').forEach(function(opt){
+    opt.classList.remove('selected');
+  });
+  document.getElementById('checkpointOption' + answer).classList.add('selected');
+
+  // Save answer to server (without showing result to student)
+  var data = {
+    checkpoint_id: currentCheckpoint.checkpoint_id,
+    selected_answer: answer,
+    session_id: SESSION_ID
+  };
+
+  fetch('/learning/checkpoint/answer/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN
+    },
+    body: JSON.stringify(data)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    // Hide popup after short delay to show selection was made
+    setTimeout(function(){
+      hideCheckpointPopup();
+    }, 500);
+  })
+  .catch(function(){
+    // Hide popup even if save fails (no error shown to student)
+    setTimeout(function(){
+      hideCheckpointPopup();
+    }, 500);
+  });
+}
+
+// Trigger checkpoint at paragraph end (called when audio finishes paragraph)
+function onParagraphEnd(paraIdx){
+  if(checkpointsMap[paraIdx]){
+    showCheckpointPopup(paraIdx);
+  }
+}
 </script>
 
 <script>
@@ -1669,6 +1920,24 @@ function updateHighlight() {
         if (_curIdx >= 0 && _map[_curIdx]) _map[_curIdx].span.classList.remove('wh-active');
         if (found  >= 0 && _map[found])   _map[found].span.classList.add('wh-active');
         _curIdx = found;
+
+        // Check if we reached the end of a paragraph (last word highlighted)
+        if (found >= 0 && _map[found]) {
+            var span = _map[found].span;
+            var paragraph = span.closest('.std-para-block');
+            if (paragraph) {
+                var paraIndex = parseInt(paragraph.dataset.paraIdx || '0');
+                // Check if this is the last word in the paragraph
+                var allSpans = paragraph.querySelectorAll('.wh-word');
+                var lastSpanIndex = Array.from(allSpans).indexOf(span);
+                if (lastSpanIndex === allSpans.length - 1) {
+                    // Trigger checkpoint at paragraph end
+                    if (typeof onParagraphEnd === 'function') {
+                        onParagraphEnd(paraIndex);
+                    }
+                }
+            }
+        }
     }
 }
 

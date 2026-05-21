@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}نتائج نقاط التحقق - {{ lesson.lessontitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700&display=swap');
+:root{
+  --blue-dk:#1e3a8a;--blue:#1d4ed8;--blue-md:#3b82f6;
+  --blue-lt:#eff6ff;--blue-bd:#bfdbfe;--blue-xlt:#f0f7ff;
+  --mint:#10b981;--mint-lt:#ecfdf5;
+  --rose:#ef4444;--rose-lt:#fef2f2;
+  --ink:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --bg:#f3f6fb;--white:#ffffff;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Cairo','Tajawal',sans-serif;}
+.results-wrap{max-width:1100px;margin:0 auto;padding:2rem 1.25rem 5rem;}
+
+.results-header{
+  background:linear-gradient(135deg,var(--blue-dk),var(--blue));
+  border-radius:1.25rem;padding:1.75rem 2rem;
+  color:#fff;margin-bottom:1.5rem;
+  box-shadow:0 6px 24px rgba(29,78,216,0.2);
+}
+.results-header h1{font-size:1.5rem;font-weight:900;margin-bottom:.5rem;}
+.results-header .meta{font-size:.85rem;opacity:.9;}
+
+.back-link{
+  display:inline-flex;align-items:center;gap:.5rem;
+  color:var(--blue);font-weight:700;text-decoration:none;
+  margin-bottom:1rem;font-family:'Tajawal',sans-serif;
+}
+.back-link:hover{text-decoration:underline;}
+
+.checkpoint-card{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:1rem;padding:1.5rem;margin-bottom:1.25rem;
+  box-shadow:0 2px 12px rgba(30,64,175,0.06);
+}
+.checkpoint-header{
+  display:flex;align-items:flex-start;gap:1rem;
+  padding-bottom:1rem;border-bottom:1.5px solid var(--border);
+  margin-bottom:1rem;
+}
+.checkpoint-num{
+  width:40px;height:40px;border-radius:50%;flex-shrink:0;
+  background:var(--blue-lt);color:var(--blue-dk);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cairo',sans-serif;font-size:1rem;font-weight:800;
+}
+.checkpoint-info{flex:1;}
+.checkpoint-question{
+  font-family:'Tajawal',sans-serif;font-size:1.05rem;
+  font-weight:700;color:var(--ink);margin-bottom:.5rem;line-height:1.6;
+}
+.checkpoint-meta{
+  display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);
+}
+.checkpoint-meta span{display:flex;align-items:center;gap:.35rem;}
+.checkpoint-meta .correct{color:var(--mint);}
+.checkpoint-meta .wrong{color:var(--rose);}
+
+.answers-table{
+  width:100%;border-collapse:collapse;margin-top:1rem;
+}
+.answers-table th{
+  text-align:right;padding:.75rem 1rem;
+  background:var(--blue-lt);color:var(--blue-dk);
+  font-family:'Cairo',sans-serif;font-size:.85rem;font-weight:700;
+  border-bottom:1.5px solid var(--blue-bd);
+}
+.answers-table td{
+  padding:.75rem 1rem;border-bottom:1px solid var(--border);
+  font-family:'Tajawal',sans-serif;font-size:.9rem;
+}
+.answers-table tr:last-child td{border-bottom:none;}
+.answer-correct{color:var(--mint);font-weight:700;}
+.answer-wrong{color:var(--rose);font-weight:700;}
+.no-answers{
+  text-align:center;padding:2rem;color:var(--muted);
+  font-family:'Tajawal',sans-serif;font-size:.95rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="results-wrap">
+  <a href="{% url 'learning:lesson_result' lesson.pk %}" class="back-link">
+    <i class="fas fa-arrow-right"></i> العودة لصفحة الدرس
+  </a>
+
+  <div class="results-header">
+    <h1>نتائج نقاط التحقق</h1>
+    <div class="meta">
+      <span><i class="fas fa-book"></i> {{ lesson.lessontitle }}</span>
+      <span><i class="fas fa-users"></i> {{ results|length }} نقطة تحقق</span>
+    </div>
+  </div>
+
+  {% if results %}
+    {% for cp in results %}
+    <div class="checkpoint-card">
+      <div class="checkpoint-header">
+        <div class="checkpoint-num">{{ cp.paragraph_index|add:1 }}</div>
+        <div class="checkpoint-info">
+          <div class="checkpoint-question">{{ cp.question }}</div>
+          <div class="checkpoint-meta">
+            <span><i class="fas fa-check-circle correct"></i> الإجابة الصحيحة: {{ cp.correct_answer }}</span>
+            <span><i class="fas fa-users"></i> {{ cp.total_answers }} إجابة</span>
+            <span><i class="fas fa-chart-pie correct"></i> {{ cp.correct_count }} صحيحة ({{ cp.correct_count|floatformat:0 }}%)</span>
+          </div>
+        </div>
+      </div>
+
+      {% if cp.answers %}
+      <table class="answers-table">
+        <thead>
+          <tr>
+            <th>اسم الطالب</th>
+            <th>إجابته</th>
+            <th>النتيجة</th>
+            <th>وقت الإجابة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ans in cp.answers %}
+          <tr>
+            <td>{{ ans.student_name }}</td>
+            <td>{{ ans.selected_answer }}</td>
+            <td class="{% if ans.is_correct %}answer-correct{% else %}answer-wrong{% endif %}">
+              {% if ans.is_correct %}صحيحة{% else %}خاطئة{% endif %}
+            </td>
+            <td>{{ ans.answered_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="no-answers">لا توجد إجابات لهذه النقطة بعد</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="checkpoint-card">
+    <div class="no-answers">لا توجد نقاط تحقق لهذا الدرس بعد</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

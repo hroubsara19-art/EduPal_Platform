@@ -31,7 +31,7 @@ from django.utils import timezone
 
 from learning.models import (
     Lessoncontent, Learningsession, Performancereport, Student, Test, Subject,
-    Testattempt, Studentanswer, Teacher,
+    Testattempt, Studentanswer, Teacher, Checkpoint,
 )
 
 logger = logging.getLogger(__name__)
@@ -409,6 +409,18 @@ def lesson_session(request, lesson_id):
     student_name = request.user.fullname or request.user.username
     timing_url   = words_json_url or ''
 
+    # جلب نقاط التحقق للدرس
+    checkpoints = Checkpoint.objects.filter(lessonid=lesson).order_by('paragraph_index')
+    checkpoint_data = []
+    for cp in checkpoints:
+        checkpoint_data.append({
+            'checkpoint_id': cp.checkpointid,
+            'paragraph_index': cp.paragraph_index,
+            'question': cp.question,
+            'option_a': cp.option_a,
+            'option_b': cp.option_b,
+        })
+
     return render(request, 'student_app/lesson_session.html', {
         'lesson':         lesson,
         'image_list':     image_urls,
@@ -419,6 +431,7 @@ def lesson_session(request, lesson_id):
         'lesson_id':      lesson.pk,
         'timing_url':     timing_url,
         'student':        student,
+        'checkpoints':    checkpoint_data,
     })
 
 @_student_required
@@ -755,6 +768,18 @@ def view_lesson_student(request, lesson_id):
     ]
     visual_urls = [url for url in visual_urls if url]
 
+    # جلب نقاط التحقق للدرس
+    checkpoints = Checkpoint.objects.filter(lessonid=lesson).order_by('paragraph_index')
+    checkpoint_data = []
+    for cp in checkpoints:
+        checkpoint_data.append({
+            'checkpoint_id': cp.checkpointid,
+            'paragraph_index': cp.paragraph_index,
+            'question': cp.question,
+            'option_a': cp.option_a,
+            'option_b': cp.option_b,
+        })
+
     return render(request, 'student_app/view_lesson_student.html', {
         'lesson':         lesson,
         'lesson_test':    lesson_test,
@@ -770,6 +795,7 @@ def view_lesson_student(request, lesson_id):
         'has_ai_video':   has_ai_video,
         'visual_urls':    visual_urls,
         'has_vr':         bool(visual_urls),
+        'checkpoints':    checkpoint_data,
     })
 
 

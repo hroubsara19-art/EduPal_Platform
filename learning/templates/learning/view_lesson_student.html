@@ -224,6 +224,43 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   transition:opacity .2s,transform .15s;
 }
 .btn-finish:hover{opacity:.9;transform:translateY(-1px);color:#fff;text-decoration:none;}
+
+/* Checkpoint popup styles */
+.checkpoint-popup{
+  position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;
+}
+.checkpoint-popup.d-none{display:none!important;}
+.checkpoint-backdrop{
+  position:absolute;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);
+}
+.checkpoint-box{
+  position:relative;z-index:1;background:#fff;border-radius:1.25rem;padding:2rem;
+  max-width:480px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.2);
+}
+.checkpoint-title{
+  font-family:'Cairo',sans-serif;font-size:1.1rem;font-weight:800;margin-bottom:1.25rem;
+  color:#1e293b;display:flex;align-items:center;gap:.5rem;
+}
+.checkpoint-title i{color:#3b82f6;}
+.checkpoint-question{
+  font-family:'Tajawal',sans-serif;font-size:1rem;font-weight:700;
+  color:#1e293b;margin-bottom:1.25rem;line-height:1.6;
+}
+.checkpoint-options{display:flex;flex-direction:column;gap:.75rem;}
+.checkpoint-option{
+  padding:.85rem 1rem;border:2px solid #e2e8f0;border-radius:10px;
+  font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:600;color:#1e293b;
+  cursor:pointer;transition:all .2s;text-align:right;
+}
+.checkpoint-option:hover{
+  border-color:#3b82f6;background:#eff6ff;
+}
+.checkpoint-option.selected{
+  border-color:#3b82f6;background:#eff6ff;
+}
+.checkpoint-actions{
+  display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem;
+}
 </style>
 {% endblock %}
 
@@ -326,15 +363,37 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 
 </div>
 
+<!-- Checkpoint popup -->
+<div class="checkpoint-popup d-none" id="checkpointPopup">
+  <div class="checkpoint-backdrop"></div>
+  <div class="checkpoint-box">
+    <h5 class="checkpoint-title" id="checkpointTitle"><i class="fas fa-question-circle"></i> نقطة تحقق</h5>
+    <div class="checkpoint-question" id="checkpointQuestion"></div>
+    <div class="checkpoint-options">
+      <button type="button" class="checkpoint-option" id="checkpointOptionA" onclick="selectCheckpointAnswer('A')"></button>
+      <button type="button" class="checkpoint-option" id="checkpointOptionB" onclick="selectCheckpointAnswer('B')"></button>
+    </div>
+  </div>
+</div>
+
 <div id="alert-toast"></div>
 {% endblock %}
 
 {% block extra_js %}
 {{ lesson.ai_generatedtext|default:''|json_script:"dj-lesson-text" }}
 {{ image_list|default:"[]"|json_script:"dj-image-list" }}
+{{ checkpoints|default:"[]"|json_script:"dj-checkpoints" }}
 
 <script>
 /* â”€â”€ ط¨ظ†ط§ط، ط§ظ„ظپظ‚ط±ط§طھ + ط§ظ„طµظˆط± ط¨ظ€ JS â”€â”€ */
+var CHECKPOINTS = JSON.parse(document.getElementById('dj-checkpoints').textContent || '[]');
+var checkpointsMap = {};
+CHECKPOINTS.forEach(function(cp){
+  checkpointsMap[cp.paragraph_index] = cp;
+});
+var currentCheckpoint = null;
+var audioPausedForCheckpoint = false;
+
 (function buildParagraphs(){
   var container = document.getElementById('lesson-paragraphs-container');
   if(!container) return;
@@ -350,6 +409,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
     var imgUrl = imageList[i] || '';
     var block  = document.createElement('div');
     block.className = 'std-para-block';
+    block.dataset.paraIdx = i;
     var numHtml  = '<div class="std-para-num">' + (i+1) + '</div>';
     var textHtml = '<div class="std-para-content"><div class="std-para-text">'
                  + escHtml(text).replace(/\n/g,'<br>') + '</div></div>';
@@ -373,6 +433,76 @@ function setSpeed(s, btn) {
   btn.closest('.audio-speeds').querySelectorAll('.spd-btn')
      .forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
+}
+
+/* â”€â”€ Checkpoint Functions â”€â”€ */
+function showCheckpointPopup(paraIdx){
+  var checkpoint = checkpointsMap[paraIdx];
+  if(!checkpoint) return;
+  
+  currentCheckpoint = checkpoint;
+  document.getElementById('checkpointQuestion').textContent = checkpoint.question;
+  document.getElementById('checkpointOptionA').textContent = checkpoint.option_a;
+  document.getElementById('checkpointOptionB').textContent = checkpoint.option_b;
+  
+  // Pause audio if playing
+  var audio = document.getElementById('topAudio');
+  if(audio && !audio.paused){
+    audio.pause();
+    audioPausedForCheckpoint = true;
+  }
+  
+  document.getElementById('checkpointPopup').classList.remove('d-none');
+}
+
+function hideCheckpointPopup(){
+  document.getElementById('checkpointPopup').classList.add('d-none');
+  currentCheckpoint = null;
+  
+  // Resume audio if it was paused
+  var audio = document.getElementById('topAudio');
+  if(audio && audioPausedForCheckpoint){
+    audio.play();
+    audioPausedForCheckpoint = false;
+  }
+}
+
+function selectCheckpointAnswer(answer){
+  if(!currentCheckpoint) return;
+  
+  // Save answer to server
+  var data = {
+    checkpoint_id: currentCheckpoint.checkpoint_id,
+    selected_answer: answer,
+    session_id: SESSION_ID
+  };
+  
+  fetch('/learning/checkpoint/answer/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN
+    },
+    body: JSON.stringify(data)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d.ok){
+      hideCheckpointPopup();
+    }else{
+      alert('خطأ في حفظ الإجابة');
+    }
+  })
+  .catch(function(){
+    hideCheckpointPopup(); // Hide popup even if save fails
+  });
+}
+
+// Trigger checkpoint at paragraph end (called when audio finishes paragraph)
+function onParagraphEnd(paraIdx){
+  if(checkpointsMap[paraIdx]){
+    showCheckpointPopup(paraIdx);
+  }
 }
 
 /* â”€â”€ طھطھط¨ط¹ ط§ظ„ط§ظ†طھط¨ط§ظ‡ (طھظ… طھطµط­ظٹط­ طھط¯ط§ط®ظ„ Django ظˆ JS) â”€â”€ */
