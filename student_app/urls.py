@@ -61,4 +61,8 @@ urlpatterns = [
     
     # ── Baseline Data API ─────────────────────────────────────
     path('baseline-data/', views.get_baseline_data, name='get_baseline_data'),
+    
+    # ── Adaptive Support Options ─────────────────────────────
+    path('adaptive-support/<int:session_id>/', views.adaptive_support_options, name='adaptive_support_options'),
+    path('adaptive-support/action/', views.adaptive_support_action, name='adaptive_support_action'),
 ]

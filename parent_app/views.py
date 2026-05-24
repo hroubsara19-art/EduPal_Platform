@@ -295,12 +295,9 @@ def calibration_dashboard(request):
     if baseline.is_active:
         status = 'active'
         status_text = 'النموذج نشط ومثبت'
-    elif completed_sessions >= 3:
+    elif completed_sessions >= 1:
         status = 'ready_to_activate'
-        status_text = 'جاهز لتفعيل النموذج (3 جلسات مكتملة)'
-    elif completed_sessions > 0:
-        status = 'in_progress'
-        status_text = f'جاري المعايرة ({completed_sessions}/3 جلسات)'
+        status_text = f'جاهز للاستخدام ({completed_sessions} جلسة مكتملة)'
     else:
         status = 'not_started'
         status_text = 'لم تبدأ المعايرة بعد'
@@ -418,14 +415,14 @@ def activate_baseline(request):
         messages.error(request, 'لا يوجد نموذج سلوكي للطالب.')
         return redirect('parent:calibration_dashboard')
     
-    # التحقق من وجود 3 جلسات معايرة مكتملة على الأقل
+    # التحقق من وجود جلسة معايرة مكتملة على الأقل
     completed_sessions = CalibrationSession.objects.filter(
         student=child.userid,
         is_completed=True
     ).count()
     
-    if completed_sessions < 3:
-        messages.warning(request, 'يجب إكمال 3 جلسات معايرة على الأقل قبل تفعيل النموذج.')
+    if completed_sessions < 1:
+        messages.warning(request, 'يجب إكمال جلسة معايرة واحدة على الأقل قبل تفعيل النموذج.')
         return redirect('parent:calibration_dashboard')
     
     # تحديث النموذج من جلسات المعايرة

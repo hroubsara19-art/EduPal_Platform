@@ -140,11 +140,11 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
         {% if status == 'active' %}
         النموذج السلوكي نشط ومثبت. سيتم استخدامه في جميع جلسات التعلم.
         {% elif status == 'in_progress' %}
-        أكمل {{ completed_sessions }} من 3 جلسات مطلوبة. استمر في إجراء جلسات المعايرة.
+        أكملت {{ completed_sessions }} جلسة معايرة. النموذج جاهز للاستخدام، ويمكنك إضافة جلسات إضافية لزيادة الدقة.
         {% elif status == 'ready_to_activate' %}
         أكملت جميع جلسات المعايرة المطلوبة. يمكنك تفعيل النموذج الآن.
         {% else %}
-        ابدأ بإجراء جلسات المعايرة لبناء نموذج انتباه شخصي لطفلك.
+        ابدأ بإجراء جلسة معايرة واحدة لبناء نموذج انتباه شخصي لطفلك.
         {% endif %}
       </p>
     </div>
@@ -204,7 +204,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
         <p style="color:var(--muted);text-align:center;padding:2rem;">لا توجد جلسات معايرة بعد.</p>
       {% endif %}
       
-      {% if sessions.count < 5 and not baseline.is_active %}
+      {% if sessions.count < 5 %}
       <a href="{% url 'parent:start_calibration_session' %}" class="btn btn-primary" style="width:100%;margin-top:1rem;">
         <i class="fas fa-plus"></i> إضافة جلسة معايرة
       </a>
@@ -215,17 +215,31 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
     <div class="cal-card">
       <h3><i class="fas fa-info-circle"></i> ما هي المعايرة السلوكية؟</h3>
       <p style="color:var(--muted);line-height:1.8;font-size:.9rem;margin-bottom:1rem;">
-        المعايرة السلوكية هي عملية بناء نموذج انتباه شخصي لطفلك من خلال عدة جلسات قصيرة (2-5 دقائق) تُجرى في أوقات مختلفة وبيئات هادئة.
+        المعايرة السلوكية هي عملية بناء نموذج انتباه شخصي لطفلك من خلال جلسات قصيرة (2-5 دقائق) تُجرى في أوقات مختلفة وبيئات هادئة.
       </p>
+      <h4 style="font-size:.95rem;font-weight:800;margin-bottom:.5rem;">مستوى الدقة</h4>
+      <div style="background:var(--sky-lt);border:1.5px solid var(--sky-bd);border-radius:.75rem;padding:1rem;margin-bottom:1rem;">
+        {% if completed_sessions == 0 %}
+        <p style="color:var(--muted);font-size:.85rem;margin:0;">لم تُجرَ أي جلسة معايرة بعد.</p>
+        {% elif completed_sessions == 1 %}
+        <p style="color:var(--amber);font-size:.85rem;margin:0;"><strong>جلسة واحدة:</strong> نموذج أولي جاهز للاستخدام. يمكنك إضافة جلسات إضافية لزيادة الدقة.</p>
+        {% elif completed_sessions == 2 %}
+        <p style="color:var(--sky-dk);font-size:.85rem;margin:0;"><strong>جلستان:</strong> نموذج متوسط الدقة. إضافة جلسة ثالثة ستحسن الدقة بشكل ملحوظ.</p>
+        {% elif completed_sessions >= 3 %}
+        <p style="color:var(--mint);font-size:.85rem;margin:0;"><strong>3 جلسات أو أكثر:</strong> نموذج عالي الدقة ومثبت. يمكن قفل النموذج لمنع التحديثات التلقائية.</p>
+        {% endif %}
+      </div>
       <h4 style="font-size:.95rem;font-weight:800;margin-bottom:.5rem;">كيف تعمل؟</h4>
       <ul style="color:var(--muted);line-height:1.8;font-size:.85rem;padding-right:1.5rem;">
         <li>تُعرض محتوى تعليمي بسيط أو نشاط محايد</li>
         <li>يحلل النظام أنماط السلوك الطبيعية للانتباه</li>
         <li>يُبنى نموذج شخصي يعتمد على التوزيعات الإحصائية</li>
-        <li>يُثبت النموذج بعد 3 جلسات معايرة مكتملة</li>
+        <li>كل جلسة إضافية تزيد من دقة النموذج</li>
       </ul>
       <h4 style="font-size:.95rem;font-weight:800;margin-bottom:.5rem;margin-top:1rem;">ملاحظات مهمة</h4>
       <ul style="color:var(--muted);line-height:1.8;font-size:.85rem;padding-right:1.5rem;">
+        <li>جلسة واحدة كافية للاستخدام الفوري</li>
+        <li>إضافة جلسات إضافية تزيد من دقة النموذج</li>
         <li>دور الأهل مقتصر على تهيئة البيئة وتشغيل الجلسة</li>
         <li>لا توجد تدخلات أو أسئلة أو تقييمات أثناء الجلسة</li>
         <li>النموذج يمثل "نمط الانتباه الطبيعي" وليس تصنيفاً للأداء</li>

@@ -351,31 +351,13 @@ let calibrationData = {
 let dataCollectionInterval;
 
 function startBehavioralDataCollection() {
-  // جمع البيانات السلوكية بشكل دوري
+  // جمع البيانات السلوكية بشكل دوري باستخدام الخوارزمية الجديدة
   dataCollectionInterval = setInterval(() => {
-    // محاكاة جمع البيانات السلوكية
     // في الواقع، يجب استخدام attention_engine.py أو مكتبة JavaScript لتحليل الوجه
+    // هذا المكان مخصص لجمع البيانات السلوكية الخام من الكاميرا
+    // ثم إرسالها إلى الخادم لمعالجتها باستخدام الخوارزمية الجديدة
+    
     calibrationData.total_frames += 1;
-    
-    // إضافة بيانات محاكاة للمعايرة
-    calibrationData.ear_values.push(0.3 + Math.random() * 0.1);
-    calibrationData.head_yaw_values.push((Math.random() - 0.5) * 20);
-    calibrationData.head_pitch_values.push((Math.random() - 0.5) * 15);
-    calibrationData.head_roll_values.push((Math.random() - 0.5) * 10);
-    calibrationData.gaze_horizontal_values.push((Math.random() - 0.5) * 15);
-    calibrationData.gaze_vertical_values.push((Math.random() - 0.5) * 10);
-    calibrationData.nose_ear_ratio_values.push(2.5 + Math.random() * 0.5);
-    
-    // محاكاة تكرارات السلوك
-    if (Math.random() < 0.05) {
-      calibrationData.head_turn_count += 1;
-    }
-    if (Math.random() < 0.03) {
-      calibrationData.gaze_away_count += 1;
-    }
-    if (Math.random() < 0.02) {
-      calibrationData.drowsy_count += 1;
-    }
     
     // إرسال البيانات السلوكية بشكل دوري (كل 10 ثواني)
     if (calibrationData.total_frames % 10 === 0) {

@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}خيارات الدعم التكيفي{% endblock %}
+
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+:root{
+  --sky:#3b82f6;--sky-dk:#1d4ed8;--sky-lt:#eff6ff;--sky-bd:#bfdbfe;
+  --mint:#10b981;--amber:#f59e0b;--rose:#ef4444;
+  --ink:#1e293b;--muted:#64748b;--border:#e2e8f0;--bg:#f0f5fb;--card:#fff;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',sans-serif;}
+
+.support-wrap{
+  max-width:900px;margin:2rem auto;padding:0 1.5rem 4rem;
+}
+
+/* ── Header ── */
+.support-header{
+  background:linear-gradient(135deg,var(--sky-dk),var(--sky));
+  border-radius:1.25rem;padding:2.5rem;
+  color:#fff;margin-bottom:2rem;
+  box-shadow:0 6px 24px rgba(29,78,216,0.2);
+  text-align:center;
+}
+.support-header h1{font-size:1.8rem;font-weight:900;margin-bottom:.5rem;}
+.support-header p{opacity:.9;font-size:.95rem;}
+
+/* ── Info Card ── */
+.info-card{
+  background:#fff;border-radius:1rem;padding:2rem;
+  margin-bottom:2rem;border:2px solid var(--border);
+  box-shadow:0 4px 16px rgba(0,0,0,.08);
+}
+.info-card h2{font-size:1.3rem;font-weight:800;margin-bottom:1rem;color:var(--sky-dk);}
+.info-card p{color:var(--muted);line-height:2;font-size:1rem;margin-bottom:1rem;}
+
+/* ── Stats ── */
+.stats-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;
+  margin-bottom:2rem;
+}
+.stat-box{
+  background:var(--sky-lt);border:1.5px solid var(--sky-bd);
+  border-radius:.75rem;padding:1.5rem;text-align:center;
+}
+.stat-box h4{font-size:1.8rem;font-weight:900;color:var(--sky-dk);margin-bottom:.3rem;}
+.stat-box p{color:var(--muted);font-size:.85rem;}
+
+/* ── Options Grid ── */
+.options-grid{
+  display:grid;grid-template-columns:1fr;gap:1.5rem;
+  margin-bottom:2rem;
+}
+
+.option-card{
+  background:#fff;border-radius:1rem;padding:2rem;
+  border:2px solid var(--border);
+  cursor:pointer;transition:all .3s;
+}
+.option-card:hover{
+  border-color:var(--sky-dk);
+  box-shadow:0 8px 24px rgba(29,78,216,.15);
+  transform:translateY(-2px);
+}
+.option-card.selected{
+  border-color:var(--mint);
+  background:#f0fdf4;
+}
+.option-card h3{font-size:1.2rem;font-weight:800;margin-bottom:.8rem;color:var(--ink);}
+.option-card p{color:var(--muted);line-height:1.8;font-size:.95rem;margin-bottom:1rem;}
+.option-card .icon{
+  width:60px;height:60px;border-radius:50%;
+  background:var(--sky-lt);display:flex;
+  align-items:center;justify-content:center;
+  margin-bottom:1rem;font-size:1.5rem;color:var(--sky-dk);
+}
+.option-card.selected .icon{background:var(--mint);color:#fff;}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:1rem 2.5rem;border-radius:.75rem;border:none;
+  font-family:'Tajawal',sans-serif;font-size:1rem;
+  font-weight:800;cursor:pointer;transition:all .18s;
+  text-decoration:none;
+}
+.btn-primary{background:var(--sky-dk);color:#fff;box-shadow:0 4px 12px rgba(29,78,216,.3);}
+.btn-primary:hover{background:#1e3a8a;color:#fff;}
+.btn-ghost{background:var(--border);color:var(--muted);}
+.btn-ghost:hover{background:#d1d5db;color:var(--ink);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="support-wrap" dir="rtl">
+
+  <!-- Header -->
+  <div class="support-header">
+    <h1>خيارات الدعم التكيفي</h1>
+    <p>نظام EduPal يقدم خيارات داعمة لتحسين تجربة التعلم</p>
+  </div>
+
+  <!-- Info Card -->
+  <div class="info-card">
+    <h2>لماذا هذه الخيارات؟</h2>
+    <p>
+      لاحظنا أن نمط عرض المحتوى الحالي قد لا يكون متوافقاً تماماً مع حالتك الإدراكية الحالية.
+      هذه ليست مشكلة في قدراتك، بل مؤشر على أننا بحاجة لتغيير طريقة تقديم المحتوى.
+    </p>
+    <p>
+      النظام يهدف إلى الدعم والتكيف المستمر، وليس الحكم أو الضغط عليك.
+    </p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <h4>{{ engagement_drop|floatformat:0 }}%</h4>
+      <p>انخفاض الانخراط</p>
+    </div>
+    <div class="stat-box">
+      <h4>{{ wrong_answer_pct|floatformat:0 }}%</h4>
+      <p>إجابات خاطئة</p>
+    </div>
+    <div class="stat-box">
+      <h4>{{ consecutive_failures }}</h4>
+      <p>محاولات متتالية</p>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="options-grid">
+    
+    <!-- Option 1: Postpone -->
+    <div class="option-card" onclick="selectOption(this, 'postpone')">
+      <div class="icon"><i class="fas fa-clock"></i></div>
+      <h3>تأجيل الجلسة</h3>
+      <p>
+        تأجيل الجلسة التعليمية إلى وقت لاحق عندما تكون في حالة أفضل للتركيز.
+        يمكنك العودة إليها في أي وقت يناسبك.
+      </p>
+    </div>
+
+    <!-- Option 2: Modify Content -->
+    <div class="option-card" onclick="selectOption(this, 'modify')">
+      <div class="icon"><i class="fas fa-edit"></i></div>
+      <h3>مراجعة وتعديل المحتوى</h3>
+      <p>
+        طلب من المعلم مراجعة وتعديل المحتوى ليكون أكثر تناسباً مع أسلوب تعلمك.
+        المعلم سيقوم بتكييف المحتوى بناءً على احتياجاتك.
+      </p>
+    </div>
+
+    <!-- Option 3: VR Environment -->
+    <div class="option-card" onclick="selectOption(this, 'vr')">
+      <div class="icon"><i class="fas fa-vr-cardboard"></i></div>
+      <h3>بيئة الواقع الافتراضي (VR)</h3>
+      <p>
+        الانتقال إلى بيئة تعلم أكثر تفاعلية باستخدام الواقع الافتراضي.
+        هذا النمط يغير طريقة الإدراك ويعزز استمرارية التعلم.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- Actions -->
+  <div style="display:flex;gap:1rem;justify-content:center;">
+    <button id="confirmBtn" class="btn btn-primary" onclick="confirmSelection()" disabled>
+      <i class="fas fa-check"></i> تأكيد الاختيار
+    </button>
+    <a href="{% url 'student:lesson_session' lesson_id %}" class="btn btn-ghost">
+      <i class="fas fa-times"></i> إلغاء
+    </a>
+  </div>
+
+</div>
+
+<script>
+let selectedOption = null;
+
+function selectOption(element, option) {
+  // Remove selected class from all cards
+  document.querySelectorAll('.option-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  
+  // Add selected class to clicked card
+  element.classList.add('selected');
+  selectedOption = option;
+  
+  // Enable confirm button
+  document.getElementById('confirmBtn').disabled = false;
+}
+
+function confirmSelection() {
+  if (!selectedOption) return;
+  
+  // Send selection to server
+  fetch(`/student/adaptive-support/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      'option': selectedOption,
+      'session_id': '{{ session_id }}'
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('تم تأكيد اختيارك بنجاح!');
+      window.location.href = data.redirect_url;
+    } else {
+      alert('حدث خطأ. يرجى المحاولة مرة أخرى.');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('حدث خطأ في الاتصال.');
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+
+{% endblock %}

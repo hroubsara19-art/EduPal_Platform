@@ -1123,6 +1123,7 @@ def get_baseline_data(request):
     
     # تحويل البيانات إلى قاموس
     baseline_dict = {
+        # الإحصاءات التقليدية (mean/std)
         'ear_mean': baseline.ear_mean,
         'ear_std': baseline.ear_std,
         'ear_min': baseline.ear_min,
@@ -1151,6 +1152,20 @@ def get_baseline_data(request):
         'nose_ear_ratio_std': baseline.nose_ear_ratio_std,
         'nose_ear_ratio_min': baseline.nose_ear_ratio_min,
         'nose_ear_ratio_max': baseline.nose_ear_ratio_max,
+        # ✅ Robust Statistics (median/MAD) للخوارزمية الجديدة
+        'ear_median': baseline.ear_median,
+        'ear_mad': baseline.ear_mad,
+        'head_yaw_median': baseline.head_yaw_median,
+        'head_yaw_mad': baseline.head_yaw_mad,
+        'head_pitch_median': baseline.head_pitch_median,
+        'head_pitch_mad': baseline.head_pitch_mad,
+        'head_roll_median': baseline.head_roll_median,
+        'head_roll_mad': baseline.head_roll_mad,
+        'gaze_horizontal_median': baseline.gaze_horizontal_median,
+        'gaze_horizontal_mad': baseline.gaze_horizontal_mad,
+        'gaze_vertical_median': baseline.gaze_vertical_median,
+        'gaze_vertical_mad': baseline.gaze_vertical_mad,
+        # العتبات الشخصية
         'yaw_threshold_personal': baseline.yaw_threshold_personal,
         'pitch_threshold_personal': baseline.pitch_threshold_personal,
         'gaze_horizontal_threshold_personal': baseline.gaze_horizontal_threshold_personal,
@@ -1158,3 +1173,99 @@ def get_baseline_data(request):
     }
     
     return JsonResponse({'ok': True, 'baseline_data': baseline_dict})
+
+
+@login_required
+def adaptive_support_options(request, session_id=None):
+    """
+    عرض خيارات الدعم التكيفي للطالب
+    """
+    from student_app.models import CPTLSSession
+    
+    # Get session data
+    session = CPTLSSession.objects.filter(id=session_id, student=request.user).first()
+    
+    if not session:
+        return JsonResponse({'ok': False, 'error': 'Session not found'}, status=404)
+    
+    # Get adaptive evaluation data
+    from attention_tracker.cptls_engine import CPTLSEngine
+    engine = CPTLSEngine()
+    
+    # Import baseline if exists
+    from student_app.models import CPTLSBaseline
+    baseline = CPTLSBaseline.objects.filter(student=request.user, is_active=True).first()
+    if baseline:
+        engine.import_baseline({
+            'student_id': request.user.id,
+            'feature_medians': baseline.get_feature_means().tolist(),  # ✅ Robust Statistics (stored in mean fields)
+            'feature_mads': baseline.get_feature_stds().tolist(),  # ✅ Median Absolute Deviation (stored in std fields)
+            'calibration_samples': baseline.calibration_samples,
+            'last_updated': baseline.last_updated.isoformat()
+        })
+    
+    # Evaluate adaptive escalation
+    session_duration = session.duration_seconds or 300
+    result = engine.evaluate_adaptive_escalation(
+        student_id=request.user.id,
+        session_duration=session_duration,
+        content_mode=session.content_mode,
+        total_questions=session.total_questions_asked,
+        correct_answers=session.correct_answers,
+        incorrect_answers=session.incorrect_answers
+    )
+    
+    context = {
+        'session_id': session_id,
+        'lesson_id': session.lesson_id,
+        'engagement_drop': result.get('engagement_drop_pct', 0),
+        'wrong_answer_pct': result.get('wrong_answer_pct', 0),
+        'consecutive_failures': result.get('consecutive_failures', 0),
+        'suggestion': result.get('suggestion', 'none'),
+    }
+    
+    return render(request, 'student_app/adaptive_support_options.html', context)
+
+
+@login_required
+@require_POST
+def adaptive_support_action(request):
+    """
+    معالجة اختيار الطالب لخيار الدعم التكيفي
+    """
+    import json
+    data = json.loads(request.body)
+    
+    option = data.get('option')
+    session_id = data.get('session_id')
+    
+    from student_app.models import CPTLSSession
+    
+    session = CPTLSSession.objects.filter(id=session_id, student=request.user).first()
+    
+    if not session:
+        return JsonResponse({'success': False, 'error': 'Session not found'}, status=404)
+    
+    # Update session with adaptive suggestion
+    if option == 'postpone':
+        session.adaptive_suggestion_type = 'postpone_session'
+        session.adaptive_suggestion_made = True
+        session.save()
+        redirect_url = f'/student/dashboard/'
+    elif option == 'modify':
+        session.adaptive_suggestion_type = 'modify_content'
+        session.adaptive_suggestion_made = True
+        session.save()
+        redirect_url = f'/student/dashboard/'
+    elif option == 'vr':
+        session.adaptive_suggestion_type = 'vr_environment'
+        session.adaptive_suggestion_made = True
+        session.save()
+        redirect_url = f'/student/dashboard/'
+    else:
+        return JsonResponse({'success': False, 'error': 'Invalid option'}, status=400)
+    
+    return JsonResponse({
+        'success': True,
+        'redirect_url': redirect_url
+    })
