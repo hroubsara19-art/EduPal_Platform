@@ -28,6 +28,7 @@ from io import BytesIO
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from asgiref.sync import sync_to_async
 from fastapi.websockets import WebSocket, WebSocketDisconnect
 from attention_engine import AttentionTracker
 try:
@@ -309,8 +310,8 @@ async def ws_attention(websocket: WebSocket, session_id: str):
                                 if len(parts) >= 4 and parts[0] == "lesson" and parts[2] == "student":
                                     lesson_id = int(parts[1])
                                     student_id = int(parts[3])
-                                    # تحديث اللقطة اللحظية
-                                    learning_state_updater.update_snapshot_from_attention(
+                                    # ✅ استخدام sync_to_async لتجنب async context error
+                                    await sync_to_async(learning_state_updater.update_snapshot_from_attention)(
                                         lesson_id, student_id, state_dict
                                     )
                             except Exception as e:

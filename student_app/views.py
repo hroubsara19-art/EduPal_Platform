@@ -386,6 +386,8 @@ def lesson_session(request, lesson_id):
             session_obj.starttime     = timezone.now()
             session_obj.sessionstatus = 'Active'
             session_obj.save(update_fields=['starttime', 'sessionstatus'])
+    else:
+        session_obj = None
 
     visuals    = lesson.ai_visualpath if isinstance(lesson.ai_visualpath, list) else []
     image_urls = []
@@ -405,9 +407,10 @@ def lesson_session(request, lesson_id):
             clean_audio = clean_audio[len('media/'):]
         words_json_url = _media_file_url_if_exists(clean_audio + '.json')
 
-    # session_id should be a real Learningsession pk or null
-    # For now, we'll pass null since we don't create a Learningsession
-    session_id   = None
+    # ✅ استخدام session_obj.sessionid الفعلي بدلاً من None
+    session_id   = session_obj.sessionid if session_obj else None
+    # ✅ إنشاء session_id string للاتصال بخادم الانتباه
+    session_string = f"lesson_{lesson.pk}_student_{student.pk if student else 0}"
     student_name = request.user.fullname or request.user.username
     timing_url   = words_json_url or ''
 
@@ -431,6 +434,7 @@ def lesson_session(request, lesson_id):
         'audio_url':      audio_url,
         'words_json_url': words_json_url,
         'session_id':     session_id,
+        'session_string': session_string,  # ✅ إضافة session_id string للاتصال بخادم الانتباه
         'student_name':   student_name,
         'lesson_id':      lesson.pk,
         'timing_url':     timing_url,
@@ -1251,17 +1255,17 @@ def adaptive_support_action(request):
         session.adaptive_suggestion_type = 'postpone_session'
         session.adaptive_suggestion_made = True
         session.save()
-        redirect_url = f'/student/dashboard/'
+        redirect_url = f'/student/home/'
     elif option == 'modify':
         session.adaptive_suggestion_type = 'modify_content'
         session.adaptive_suggestion_made = True
         session.save()
-        redirect_url = f'/student/dashboard/'
+        redirect_url = f'/student/home/'
     elif option == 'vr':
         session.adaptive_suggestion_type = 'vr_environment'
         session.adaptive_suggestion_made = True
         session.save()
-        redirect_url = f'/student/dashboard/'
+        redirect_url = f'/student/home/'
     else:
         return JsonResponse({'success': False, 'error': 'Invalid option'}, status=400)
     

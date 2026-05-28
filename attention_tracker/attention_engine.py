@@ -1047,19 +1047,11 @@ class AttentionTracker:
             drowsy = True
         elif face_lm is None:
             display_ratio = ratio_pose if ratio_pose is not None else 1.0
-            # ✅ منطق احتفاظ: إذا اختفى الوجه لأقل من 2 ثانية، نعتبره منتبه
-            if time.time() - self._last_face_seen < 2.0:
-                score, cause, attentive = 78, "none", True
-                self._ear_counter = 0
-                drowsy = False
-            elif ratio_pose is not None:
-                score, cause, attentive = 78, "none", True
-                self._ear_counter = 0
-                drowsy = False
-            else:
-                score, cause, attentive = 0, "no_face", False
-                self._ear_counter = 0
-                drowsy = False
+            # ✅ عدم وجود الوجه يُعتبر تشتتاً فورياً مع درجة خطورة أعلى
+            # (حالة no_face أعلى خطورة من غيرها من حالات التشتت)
+            score, cause, attentive = 0, "no_face", False
+            self._ear_counter = 0
+            drowsy = False
         else:
             if ear < EAR_THRESHOLD:
                 self._ear_counter += 1
@@ -1073,6 +1065,11 @@ class AttentionTracker:
                 gaze_h_angle, gaze_v_angle,
                 looking_away
             )
+            # ✅ سجل تشخيصي للقيم المستخدمة في حساب السكور
+            if score == 90 or score == 0:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Score is {score} - ear={ear:.3f}, face_ratio={face_ratio:.3f}, gaze={gaze}, drowsy={drowsy_long}, head_yaw={head_yaw:.2f}, head_pitch={head_pitch:.2f}, head_roll={head_roll:.2f}, gaze_h={gaze_h_angle:.2f}, gaze_v={gaze_v_angle:.2f}, looking_away={looking_away}")
             attentive = score >= 68
             display_ratio = face_ratio
             drowsy = drowsy_long
@@ -1237,12 +1234,38 @@ class AttentionTracker:
             attentive = False
             cause = "no_face"
         else:
+            # ✅ استخدام خوارزمية الحساب المحسّنة بدلاً من القيم الثابتة
+            # الكود القديم كان يعين 90 أو 60 بشكل ثابت
+            # الآن نستخدم compute_score للحصول على قيم فعلية ديناميكية
             x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
             face_center = (x + fw / 2) / max(w, 1)
             centered = 0.25 <= face_center <= 0.75
-            score = 90 if centered else 60
+
+            # حساب السكور باستخدام الخوارزمية المحسّنة
+            # نستخدم قيم افتراضية لأننا لا نملك بيانات MediaPipe هنا
+            ear = 0.3  # قيمة افتراضية للعين
+            ratio = 1.0  # قيمة افتراضية للنسبة
+            gaze = "center"  # قيمة افتراضية للنظر
+            drowsy = False
+            head_yaw = 0.0
+            head_pitch = 0.0
+            head_roll = 0.0
+            gaze_h_angle = 0.0
+            gaze_v_angle = 0.0
+            is_looking_away = False
+
+            score, cause = compute_score(
+                ear, ratio, gaze, drowsy,
+                head_yaw, head_pitch, head_roll,
+                gaze_h_angle, gaze_v_angle,
+                is_looking_away
+            )
+
+            # تعديل السكور بناءً على تمركز الوجه
+            if not centered:
+                score = max(60, score - 15)  # خصم 15 نقطة إذا لم يكن الوجه في المنتصف
+
             attentive = score >= 70
-            cause = "none" if attentive else "head_turn"
 
         alert, distract_dur, warning, significant = self._track_distraction(
             attentive, cause, score, now

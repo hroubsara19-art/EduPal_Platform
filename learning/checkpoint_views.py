@@ -261,16 +261,22 @@ def submit_checkpoint_answer(request):
     response_time = float(data.get('response_time', 0))
     current_position = float(data.get('current_position', 0))
     content_type = data.get('content_type', 'text')
-    
+    session_duration = float(data.get('session_duration', 0))  # ✅ مدة الجلسة (التسجيل الصوتي أو الفيديو) بالثواني
+
+    # ✅ إضافة سجلات للتشخيص
+    logger.info(f"Checkpoint answer submission - session_id: {session_id}, checkpoint_id: {checkpoint_id}, selected_answer: {selected_answer}")
+    logger.info(f"Full request data keys: {list(data.keys())}")
+
     if checkpoint_id is None:
         return JsonResponse({'success': False, 'error': 'checkpoint_id required'})
-    
+
     try:
         checkpoint_id = int(checkpoint_id)
     except (ValueError, TypeError):
         return JsonResponse({'success': False, 'error': 'checkpoint_id must be a number'})
-    
+
     if not session_id:
+        logger.error(f"session_id is missing or falsy. Value: {session_id}, Type: {type(session_id)}")
         return JsonResponse({'success': False, 'error': 'session_id required'})
     
     # تحويل session_id إلى int إذا كان سلسلة نصية
@@ -297,7 +303,7 @@ def submit_checkpoint_answer(request):
         rewind_position = None
         if not answer.is_correct and answer.support_intervention_triggered:
             rewind_position = manager.get_rewind_position(
-                checkpoint_id, current_position, content_type
+                checkpoint_id, current_position, content_type, session_duration
             )
         
         # لا نُظهر للطالب ما إذا كانت إجابته صحيحة أو خاطئة

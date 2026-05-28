@@ -105,8 +105,8 @@ class SecurityHeadersMiddleware:
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data: blob: https:; "
         # أضفنا blob: هنا لأن معالجة الصوت في المتصفح غالباً ما تحتاجها
-        "media-src 'self' blob:; " 
-        "connect-src 'self' ws://localhost:5050 ws://127.0.0.1:5050; "
+        "media-src 'self' blob:; "
+        "connect-src 'self' ws://localhost:5050 ws://127.0.0.1:5050 https://cdn.jsdelivr.net; "
         "frame-ancestors 'none';"
     )
 

@@ -119,16 +119,34 @@ def api_start():
             "camera_index": 0
         }
     """
-    data         = request.get_json(force=True)
+    try:
+        data = request.get_json(force=True)
+        logger.info(f"Received /api/start request: {data}")
+    except Exception as e:
+        logger.error(f"Failed to parse JSON: {e}")
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
+    
     session_id   = data.get("session_id",   "default")
     student_name = data.get("student_name", "الطالب")
-    camera_index = int(data.get("camera_index", 0))
+    
+    try:
+        camera_index = int(data.get("camera_index", 0))
+    except (ValueError, TypeError) as e:
+        logger.error(f"Invalid camera_index: {e}")
+        return jsonify({"error": f"Invalid camera_index: {str(e)}"}), 400
 
     # قفل واحد من الفحص حتى اكتمال التهيئة يمنع طلبين متزامنين لنفس session_id
     # من تجاوز الفحص واستبدال الجلسة الأولى بجلسة يتيمة.
     with _lock:
-        if session_id in _sessions and _sessions[session_id]["running"]:
-            return jsonify({"error": "الجلسة نشطة بالفعل"}), 400
+        existing = _sessions.get(session_id)
+        if existing and existing.get("running"):
+            # إذا كانت الجلسة تعمل بالفعل، نعيد ws_url بدلاً من إرجاع خطأ
+            logger.info(f"api_start: session {session_id} already running, returning existing ws_url")
+            return jsonify({
+                "ok": True,
+                "session_id": session_id,
+                "ws_url": f"ws://localhost:5050/ws/attention/{session_id}",
+            })
 
         session = _make_session(session_id, student_name, camera_index)
         _sessions[session_id] = session

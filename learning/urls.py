@@ -67,6 +67,11 @@ urlpatterns = [
     path('delete-checkpoint/', checkpoint_views.delete_checkpoint, name='delete_checkpoint'),
     path('get-checkpoint/', checkpoint_views.get_checkpoint_for_student, name='get_checkpoint_for_student'),
     path('submit-checkpoint-answer/', checkpoint_views.submit_checkpoint_answer, name='submit_checkpoint_answer'),
+
+    # ── API للنموذج الاحتمالي ─────────────────────────────────
+    path('api/cognitive_signal/', learning_views.api_cognitive_signal, name='api_cognitive_signal'),
+    path('api/behavioral_baseline/', learning_views.api_behavioral_baseline, name='api_behavioral_baseline'),
+    path('api/send_level3_notification/', learning_views.api_send_level3_notification, name='api_send_level3_notification'),
 ]
 
 if settings.DEBUG:

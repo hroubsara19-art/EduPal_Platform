@@ -1483,6 +1483,121 @@ def student_checkpoint_answer(request):
 
 
 @login_required
+@require_POST
+def api_cognitive_signal(request):
+    """Endpoint لتغذية النموذج الاحتمالي بالإشارات المعرفية"""
+    role = getattr(request.user, 'userrole', None)
+    if role != ROLE_STUDENT:
+        return JsonResponse({'error': 'هذه الخاصية للطلاب فقط'}, status=403)
+
+    try:
+        data = _json.loads(request.body)
+        is_correct = data.get('is_correct')
+        session_id = data.get('session_id')
+        checkpoint_id = data.get('checkpoint_id')
+
+        if is_correct is None:
+            return JsonResponse({'error': 'يجب تحديد is_correct'}, status=400)
+
+        # ✅ يمكن هنا تخزين الإشارة المعرفية في قاعدة البيانات إذا لزم الأمر
+        # حالياً نعيد فقط الاستجابة للنموذج الاحتمالي في frontend
+
+        return JsonResponse({
+            'success': True,
+            'is_correct': is_correct,
+            'session_id': session_id,
+            'checkpoint_id': checkpoint_id
+        })
+    except Exception as e:
+        logger.error(f'api_cognitive_signal error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def api_send_level3_notification(request):
+    """Endpoint لإرسال إشعارات المستوى 3 للمعلم وولي الأمر"""
+    role = getattr(request.user, 'userrole', None)
+    if role != ROLE_STUDENT:
+        return JsonResponse({'error': 'هذه الخاصية للطلاب فقط'}, status=403)
+
+    try:
+        data = _json.loads(request.body)
+        lesson_id = data.get('lesson_id')
+        session_id = data.get('session_id')
+        lesson_type = data.get('lesson_type', 'video')
+        lesson_title = data.get('lesson_title', 'الدرس')
+
+        if not lesson_id or not session_id:
+            return JsonResponse({'error': 'يجب تحديد lesson_id و session_id'}, status=400)
+
+        # ✅ هنا يمكن إضافة منطق إرسال الإشعارات الفعلي للمعلم وولي الأمر
+        # حالياً نعيد فقط استجابة ناجحة
+        logger.info(f'Level 3 notification triggered: lesson_id={lesson_id}, session_id={session_id}, type={lesson_type}')
+
+        return JsonResponse({
+            'success': True,
+            'message': 'تم استلام إشعار المستوى 3',
+            'lesson_id': lesson_id,
+            'session_id': session_id
+        })
+    except Exception as e:
+        logger.error(f'api_send_level3_notification error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def api_behavioral_baseline(request):
+    """Endpoint لجلب بيانات المعايرة السلوكية الشخصية للطالب"""
+    role = getattr(request.user, 'userrole', None)
+    if role != ROLE_STUDENT:
+        return JsonResponse({'error': 'هذه الخاصية للطلاب فقط'}, status=403)
+
+    try:
+        from student_app.models import BehavioralBaseline
+
+        baseline = BehavioralBaseline.objects.filter(student=request.user).first()
+        if not baseline or not baseline.is_active:
+            return JsonResponse({
+                'success': True,
+                'has_baseline': False,
+                'message': 'لا يوجد نموذج معايرة نشط'
+            })
+
+        # ✅ إرجاع بيانات المعايرة الشخصية باستخدام الحقول الصحيحة
+        return JsonResponse({
+            'success': True,
+            'has_baseline': True,
+            'is_active': baseline.is_active,
+            'is_locked': baseline.is_locked,
+            'calibration_sessions_count': baseline.calibration_sessions_count,
+            # التوزيعات الإحصائية - EAR
+            'ear_mean': baseline.ear_mean,
+            'ear_std': baseline.ear_std,
+            'ear_median': baseline.ear_median,
+            'ear_mad': baseline.ear_mad,
+            # التوزيعات الإحصائية - Gaze (استخدام الحقول الصحيحة)
+            'gaze_horizontal_mean': baseline.gaze_horizontal_mean,
+            'gaze_horizontal_std': baseline.gaze_horizontal_std,
+            'gaze_vertical_mean': baseline.gaze_vertical_mean,
+            'gaze_vertical_std': baseline.gaze_vertical_std,
+            # التوزيعات الإحصائية - Head Pose
+            'head_yaw_mean': baseline.head_yaw_mean,
+            'head_yaw_std': baseline.head_yaw_std,
+            'head_pitch_mean': baseline.head_pitch_mean,
+            'head_pitch_std': baseline.head_pitch_std,
+            'head_roll_mean': baseline.head_roll_mean,
+            'head_roll_std': baseline.head_roll_std,
+            # التوزيعات الإحصائية - Nose/Ear Ratio
+            'nose_ear_ratio_mean': baseline.nose_ear_ratio_mean,
+            'nose_ear_ratio_std': baseline.nose_ear_ratio_std,
+        })
+    except Exception as e:
+        logger.error(f'api_behavioral_baseline error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
 def checkpoint_results(request, lesson_id):
     """عرض نتائج نقاط التحقق للمعلم"""
     is_admin = request.user.is_staff or request.user.is_superuser

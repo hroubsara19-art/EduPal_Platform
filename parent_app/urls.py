@@ -11,6 +11,8 @@ urlpatterns = [
     path('parent/calibration/start/', views.start_calibration_session, name='start_calibration_session'),
     path('parent/calibration/session/<int:session_id>/', views.calibration_session_detail, name='calibration_session_detail'),
     path('parent/calibration/session/<int:session_id>/start/', views.start_calibration_session_for_student, name='start_calibration_session_for_student'),
+    path('parent/calibration/session/<int:session_id>/delete/', views.delete_calibration_session, name='delete_calibration_session'),
+    path('parent/calibration/session/<int:session_id>/delete-video/', views.delete_calibration_video, name='delete_calibration_video'),
     path('parent/calibration/activate/', views.activate_baseline, name='activate_baseline'),
     path('parent/calibration/reset/', views.reset_baseline, name='reset_baseline'),
 ]

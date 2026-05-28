@@ -504,3 +504,57 @@ def start_calibration_session_for_student(request, session_id):
         'session': session,
         'is_parent_view': True,  # للإشارة إلى أن هذا العرض من واجهة الأهل
     })
+
+
+@_parent_required
+def delete_calibration_session(request, session_id):
+    """
+    حذف جلسة المعايرة
+    """
+    parent = request.parent_obj
+    child = parent.childid if parent else None
+    
+    if not child:
+        messages.error(request, 'لا يوجد طالب مرتبط بحسابك.')
+        return redirect('parent:calibration_dashboard')
+    
+    session = get_object_or_404(
+        CalibrationSession,
+        pk=session_id,
+        student=child.userid
+    )
+    
+    session_number = session.session_number
+    session.delete()
+    
+    messages.success(request, f'تم حذف جلسة المعايرة #{session_number}.')
+    return redirect('parent:calibration_dashboard')
+
+
+@_parent_required
+def delete_calibration_video(request, session_id):
+    """
+    حذف الفيديو المخصص من جلسة المعايرة
+    """
+    parent = request.parent_obj
+    child = parent.childid if parent else None
+    
+    if not child:
+        messages.error(request, 'لا يوجد طالب مرتبط بحسابك.')
+        return redirect('parent:calibration_dashboard')
+    
+    session = get_object_or_404(
+        CalibrationSession,
+        pk=session_id,
+        student=child.userid
+    )
+    
+    if session.calibration_video:
+        session.calibration_video.delete(save=False)
+        session.calibration_video = None
+        session.save(update_fields=['calibration_video'])
+        messages.success(request, 'تم حذف الفيديو المخصص بنجاح.')
+    else:
+        messages.warning(request, 'لا يوجد فيديو مخصص لحذفه.')
+    
+    return redirect('parent:calibration_session_detail', session_id=session.pk)

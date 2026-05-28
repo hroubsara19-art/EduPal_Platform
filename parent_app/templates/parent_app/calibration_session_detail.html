@@ -325,12 +325,12 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   <div class="session-card">
     <h3><i class="fas fa-cog"></i> إعدادات الجلسة</h3>
     
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" data-has-video="{% if session.calibration_video %}true{% else %}false{% endif %}" data-form-dirty="false" id="sessionForm">
       {% csrf_token %}
       
       <div class="form-group">
-        <label>وقت الجلسة</label>
-        <select name="time_of_day">
+        <label>وقت الجلسة <span style="color: var(--rose);">*</span></label>
+        <select name="time_of_day" required>
           <option value="">-- اختر وقت الجلسة --</option>
           <option value="morning" {% if session.time_of_day == 'morning' %}selected{% endif %}>صباحاً</option>
           <option value="afternoon" {% if session.time_of_day == 'afternoon' %}selected{% endif %}>ظهراً</option>
@@ -355,15 +355,29 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
       </div>
       
       <div class="form-group">
-        <label>فيديو مخصص (اختياري - حتى 5 دقائق)</label>
-        <input type="file" name="calibration_video" accept="video/*">
+        <label>فيديو مخصص <span style="color: var(--rose);">*</span></label>
+        <input type="file" name="calibration_video" accept="video/*" {% if not session.calibration_video %}required{% endif %}>
         <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">
-          إذا تركت هذا الحقل فارغاً، سيتم عرض المحتوى الافتراضي عن الانتباه والتركيز.
+          {% if session.calibration_video %}
+          يمكنك رفع فيديو جديد لاستبدال الفيديو الحالي (حتى 5 دقائق).
+          {% else %}
+          يجب رفع فيديو (حتى 5 دقائق) لجلسة المعايرة.
+          {% endif %}
         </p>
         {% if session.calibration_video %}
-        <p style="color: var(--sky-dk); font-size: 0.8rem; margin-top: 0.5rem;">
-          الفيديو الحالي: <a href="{{ session.calibration_video.url }}" target="_blank">مشاهدة</a>
-        </p>
+        <div style="margin-top: 1rem; padding: 1rem; background: var(--sky-lt); border: 1.5px solid var(--sky-bd); border-radius: 0.75rem;">
+          <p style="color: var(--sky-dk); font-size: 0.85rem; margin-bottom: 0.5rem; font-weight: 700;">
+            <i class="fas fa-video"></i> الفيديو الحالي
+          </p>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <a href="{{ session.calibration_video.url }}" target="_blank" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.4rem 1rem;">
+              <i class="fas fa-eye"></i> مشاهدة
+            </a>
+            <button type="button" class="btn" style="background: var(--rose); color: #fff; font-size: 0.8rem; padding: 0.4rem 1rem;" data-bs-toggle="modal" data-bs-target="#deleteVideoModal">
+              <i class="fas fa-trash"></i> حذف
+            </button>
+          </div>
+        </div>
         {% endif %}
       </div>
       
@@ -374,9 +388,9 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
     
     {% if not session.is_completed %}
     <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--border);">
-      <a href="{% url 'parent:start_calibration_session_for_student' session.id %}" class="btn btn-success" style="width: 100%;">
+      <button type="button" id="startSessionBtn" class="btn btn-success" style="width: 100%;" onclick="validateAndStartSession()">
         <i class="fas fa-play"></i> بدء جلسة المعايرة للطالب
-      </a>
+      </button>
       <p style="color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 0.75rem;">
         بعد الضغط، سيتم عرض جلسة المعايرة للطالب لجمع البيانات السلوكية
       </p>
@@ -423,11 +437,158 @@ function updateDurationDisplay() {
   const durationSelect = document.getElementById('durationSelect');
   const durationDisplay = document.getElementById('durationDisplay');
   const selectedValue = durationSelect.value;
-  
+
   if (selectedValue) {
     durationDisplay.textContent = selectedValue + ' دقائق';
   }
 }
+
+// Track form changes
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('sessionForm');
+  const formInputs = form.querySelectorAll('select, textarea, input[type="file"]');
+
+  formInputs.forEach(input => {
+    input.addEventListener('change', function() {
+      form.setAttribute('data-form-dirty', 'true');
+    });
+  });
+
+  // Reset dirty flag on form submit
+  form.addEventListener('submit', function() {
+    form.setAttribute('data-form-dirty', 'false');
+  });
+});
+
+function validateAndStartSession() {
+  const timeOfDay = document.querySelector('select[name="time_of_day"]').value;
+  const form = document.querySelector('form');
+  const hasVideo = form.getAttribute('data-has-video') === 'true';
+  const videoInput = document.querySelector('input[name="calibration_video"]');
+  const isFormDirty = form.getAttribute('data-form-dirty') === 'true';
+
+  if (!timeOfDay) {
+    const timeModal = new bootstrap.Modal(document.getElementById('timeRequiredModal'));
+    timeModal.show();
+    return;
+  }
+
+  if (!hasVideo && !videoInput.files.length) {
+    const videoModal = new bootstrap.Modal(document.getElementById('videoRequiredModal'));
+    videoModal.show();
+    return;
+  }
+
+  if (isFormDirty) {
+    const saveModal = new bootstrap.Modal(document.getElementById('saveSettingsModal'));
+    saveModal.show();
+    return;
+  }
+
+  window.location.href = "{% url 'parent:start_calibration_session_for_student' session.id %}";
+}
 </script>
+
+<!-- Delete Video Confirmation Modal -->
+<div class="modal fade" id="deleteVideoModal" tabindex="-1" aria-labelledby="deleteVideoModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteVideoModalLabel">
+          <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+          تأكيد الحذف
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">هل أنت متأكد من حذف الفيديو المخصص؟</p>
+        <p class="text-muted small mb-0">لا يمكن التراجع عن هذا الإجراء.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fas fa-times me-1"></i> إلغاء
+        </button>
+        <a href="{% url 'parent:delete_calibration_video' session.id %}" class="btn btn-danger">
+          <i class="fas fa-trash me-1"></i> نعم، احذف الفيديو
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Time Required Warning Modal -->
+<div class="modal fade" id="timeRequiredModal" tabindex="-1" aria-labelledby="timeRequiredModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="timeRequiredModalLabel">
+          <i class="fas fa-clock text-warning me-2"></i>
+          وقت الجلسة مطلوب
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">يرجى اختيار وقت الجلسة قبل البدء.</p>
+        <p class="text-muted small mb-0">يجب تحديد وقت الجلسة (صباحاً، ظهراً، مساءً، أو ليلاً) قبل بدء جلسة المعايرة.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          <i class="fas fa-check me-1"></i> حسناً
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Video Required Warning Modal -->
+<div class="modal fade" id="videoRequiredModal" tabindex="-1" aria-labelledby="videoRequiredModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="videoRequiredModalLabel">
+          <i class="fas fa-video text-danger me-2"></i>
+          فيديو مطلوب
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">يرجى رفع فيديو مخصص قبل البدء.</p>
+        <p class="text-muted small mb-0">يجب رفع فيديو (حتى 5 دقائق) لجلسة المعايرة قبل البدء.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          <i class="fas fa-check me-1"></i> حسناً
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Settings Warning Modal -->
+<div class="modal fade" id="saveSettingsModal" tabindex="-1" aria-labelledby="saveSettingsModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="saveSettingsModalLabel">
+          <i class="fas fa-save text-warning me-2"></i>
+          حفظ الإعدادات
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">يرجى حفظ الإعدادات قبل بدء جلسة المعايرة.</p>
+        <p class="text-muted small mb-0">تم تعديل الإعدادات ولكن لم يتم حفظها بعد.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fas fa-times me-1"></i> إلغاء
+        </button>
+        <button type="submit" form="sessionForm" class="btn btn-primary">
+          <i class="fas fa-save me-1"></i> حفظ الإعدادات
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

@@ -215,28 +215,44 @@ class CheckpointManager:
         return answer
     
     def get_rewind_position(self, checkpoint_id: int, current_position: float,
-                          content_type: str = 'text') -> float:
+                          content_type: str = 'text', session_duration: float = 0) -> float:
         """
-        يحسب موضع الرجوع (5 ثواني) لإعادة بناء السياق المعرفي
-        
+        يحسب موضع الرجوع بشكل ديناميكي بناءً على مدة الجلسة
+
+        المعادلة: (3% من مدة الجلسة بحد أدنى 5 ثواني) + (8 × (مدة الجلسة تقسيم 600 ثانية))
+        حد أقصى 55 ثانية
+
         Args:
             checkpoint_id: معرف نقطة التحقق
             current_position: الموضع الحالي
             content_type: نوع المحتوى
-            
+            session_duration: مدة الجلسة (التسجيل الصوتي أو الفيديو) بالثواني
+
         Returns:
             float: الموضع الجديد بعد الرجوع
         """
         if content_type == 'video' or content_type == 'audio':
-            # للفيديو/الصوت: رجوع 5 ثواني
-            rewind_position = max(0, current_position - 5.0)
+            # للفيديو/الصوت: رجوع ديناميكي بناءً على مدة الجلسة
+            if session_duration > 0:
+                base_rewind = max(5, session_duration * 0.03)  # 3% من مدة الجلسة بحد أدنى 5 ثواني
+                additional_rewind = 8 * (session_duration / 600)  # 8 × (مدة الجلسة تقسيم 600 ثانية)
+                rewind_seconds = min(55, base_rewind + additional_rewind)  # حد أقصى 55 ثانية
+                rewind_position = max(0, current_position - rewind_seconds)
+                logger.info(f"Dynamic rewind from {current_position} to {rewind_position} "
+                           f"(session_duration={session_duration}s, base={base_rewind}s, "
+                           f"additional={additional_rewind}s, total={rewind_seconds}s) "
+                           f"for checkpoint {checkpoint_id}")
+            else:
+                # إذا لم تكن مدة الجلسة متاحة، استخدم الرجوع الافتراضي 5 ثواني
+                rewind_position = max(0, current_position - 5.0)
+                logger.info(f"Default rewind from {current_position} to {rewind_position} "
+                           f"(no session_duration) for checkpoint {checkpoint_id}")
         else:  # text
             # للنص: رجوع فقرة واحدة (أو حوالي 5 ثواني من القراءة)
             rewind_position = max(0, int(current_position) - 1)
-        
-        logger.info(f"Rewind from {current_position} to {rewind_position} "
-                   f"for checkpoint {checkpoint_id}")
-        
+            logger.info(f"Text rewind from {current_position} to {rewind_position} "
+                       f"for checkpoint {checkpoint_id}")
+
         return rewind_position
     
     def get_checkpoint_for_display(self, current_position: float,

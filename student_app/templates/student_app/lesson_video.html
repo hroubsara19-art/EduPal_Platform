@@ -274,6 +274,12 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
   <audio id="attentionAlertSound" preload="auto"></audio>
   <audio id="videoAudio" style="display: none;"></audio>
 
+  <!-- Warning message for missing baseline -->
+  <div id="baseline-warning" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.75rem 1rem;margin:1rem 0;font-size:.85rem;color:#b45309;line-height:1.5;text-align:center;display:none;">
+    <i class="fas fa-exclamation-triangle" style="margin-left:.4rem;"></i>
+    لا توجد بيانات معايرة شخصية للطالب. يُنصح بإنشاء جلسات معايرة من خلال جلسة المعايرة في حساب الأهل للحصول على نتائج أكثر دقة. حالياً يتم استخدام بيانات افتراضية عامة.
+  </div>
+
   <a href="{% url 'student:view_lesson_student' lesson.pk %}" class="back-link">
     <i class="fas fa-arrow-right"></i>
     العودة إلى صفحة الدرس
@@ -444,11 +450,37 @@ function selectCheckpointAnswer(answer) {
   var isCorrect = (answer === currentCheckpoint.correct_answer);
   console.log('[Checkpoint] Answer is correct:', isCorrect);
 
-  // If answer is incorrect, rewind video 5 seconds then resume
+  // ✅ تحديث الإشارة المعرفية (الأداء التفاعلي - 60%)
+  updateCognitiveSignal(isCorrect, Date.now());
+
+  // ✅ عدم تصفير وقت التشتت عند الإجابة الصحيحة (قد تكون حظاً وليس فهماً)
+  // الاعتماد فقط على الانتباه المستمر (2.5 ثانية) لتصفير وقت التشتت
+
+  // ✅ حساب النوافذ الزمنية للمستويات الثلاثة بناءً على مدة الفيديو
+  var videoDuration = videoElement ? videoElement.duration || 0 : 0;
+  var level1Window = Math.max(5, Math.min(55, videoDuration * 0.03)); // المستوى 1: أدنى 5 ثواني، أو 3% من مدة الجلسة، حد أقصى 55 ثانية
+  var level2Window = Math.max(5, Math.min(180, videoDuration * 0.15)); // المستوى 2: أدنى 5 ثواني، أو 15% من مدة الجلسة، حد أقصى 3 دقائق (180 ثانية)
+  var level3Window = Math.max(15, Math.min(720, videoDuration * 0.45)); // المستوى 3: أدنى 15 ثانية، أو 45% من مدة الجلسة، حد أقصى 12 دقيقة (720 ثانية)
+
+  // ✅ تحديد المستوى بناءً على استمرار التشتت (الوقت المتواصل)
+  var distractionLevel = 1; // المستوى الافتراضي
+  if (_probabilisticModel.totalDistractionTime >= level3Window) {
+    distractionLevel = 3; // المستوى 3: استمرار التشتت لمدة 45% من مدة الجلسة
+  } else if (_probabilisticModel.totalDistractionTime >= level2Window) {
+    distractionLevel = 2; // المستوى 2: استمرار التشتت لمدة 15% من مدة الجلسة
+  }
+
+  // If answer is incorrect, rewind video dynamically based on session duration then resume
   if (!isCorrect) {
-    console.log('[Checkpoint] Incorrect answer - rewinding 5 seconds then resuming');
+    console.log('[Checkpoint] Incorrect answer - rewinding dynamically then resuming');
     if (videoElement) {
-      videoElement.currentTime = Math.max(0, videoElement.currentTime - 5);
+      // ✅ معادلة الرجوع: (3% من مدة الفيديو بحد أدنى 5 ثواني) + (8 × (مدة الفيديو تقسيم 600 ثانية))
+      var videoDuration = videoElement.duration || 0; // مدة الفيديو الفعلية (الجلسة)
+      var baseRewind = Math.max(5, videoDuration * 0.03); // 3% من مدة الفيديو بحد أدنى 5 ثواني
+      var additionalRewind = 8 * (videoDuration / 600); // 8 × (مدة الفيديو تقسيم 600 ثانية)
+      var rewindSeconds = Math.min(55, baseRewind + additionalRewind); // حد أقصى 55 ثانية
+      console.log('[Checkpoint] Rewind duration:', rewindSeconds.toFixed(2) + 's (base:', baseRewind.toFixed(2) + 's, additional:', additionalRewind.toFixed(2) + 's, video duration:', videoDuration.toFixed(2) + 's)');
+      videoElement.currentTime = Math.max(0, videoElement.currentTime - rewindSeconds);
       // Resume video after rewinding
       videoElement.play();
       videoPausedForCheckpoint = false;
@@ -459,11 +491,50 @@ function selectCheckpointAnswer(answer) {
     // Close popup WITH resuming video (correct answer)
     closeCheckpointPopup(true);
   }
+
+  // ✅ التوجيهات حسب المستوى (للمستوى 3 فقط)
+  if (distractionLevel === 3 && !isCorrect) {
+    console.log('[Checkpoint] Level 3 - Providing guidance for video session. Progress:', (sessionProgress * 100).toFixed(1) + '%');
+    var learningStyleChange = confirm('يبدو أنك تحتاج إلى تغيير أسلوب التعلم. هل ترغب في:\n\n1. أخذ استراحة قصيرة مع تمارين تنفس (شهيق وزفير)\n2. تحديث المحتوى من قبل المعلم\n3. الدخول إلى تجربة واقع افتراضي تعليمية\n\nاضغط OK للاستراحة، أو Cancel لخيارات أخرى.');
+    if (learningStyleChange) {
+      alert('خذ استراحة قصيرة مع تمارين تنفس (شهيق وزفير) لمدة دقيقتين.');
+    } else {
+      var otherOptions = confirm('هل ترغب في:\n\n1. تحديث المحتوى من قبل المعلم\n2. الدخول إلى تجربة واقع افتراضي تعليمية\n\nاضغط OK لتحديث المحتوى، أو Cancel للواقع الافتراضي.');
+      if (otherOptions) {
+        alert('سيتم تحديث المحتوى من قبل المعلم.');
+      } else {
+        alert('سيتم الدخول إلى تجربة واقع افتراضي تعليمية.');
+      }
+    }
+  }
 }
 
 // Save checkpoint answer to server
 function saveCheckpointAnswer(checkpointId, answer, responseTime, currentPosition) {
   console.log('[Checkpoint] Saving answer:', checkpointId, answer, 'Response time:', responseTime + 's', 'Current position:', currentPosition + 's');
+
+  // ✅ الحصول على مدة الجلسة (الفيديو) - التأكد من أن المدة متاحة
+  var sessionDuration = 0;
+  if (videoElement) {
+    // انتظر حتى يتم تحميل metadata الفيديو
+    if (videoElement.readyState >= 1) { // HAVE_METADATA
+      sessionDuration = videoElement.duration || 0;
+      console.log('[Checkpoint] Video duration loaded:', sessionDuration + 's');
+    } else {
+      console.warn('[Checkpoint] Video metadata not loaded yet, duration may be 0');
+      // محاولة الحصول على المدة من البيانات الوصفية إذا كانت متاحة
+      sessionDuration = videoElement.duration || 0;
+    }
+  }
+  console.log('[Checkpoint] Session duration used:', sessionDuration + 's');
+
+  // ✅ إذا كانت المدة 0، حاول الحصول عليها من البيانات الوصفية
+  if (sessionDuration === 0 && videoElement) {
+    console.warn('[Checkpoint] Session duration is 0, attempting to get from metadata');
+    // محاولة الحصول على المدة من خاصية duration مباشرة
+    sessionDuration = videoElement.duration || 0;
+    console.log('[Checkpoint] Retry session duration:', sessionDuration + 's');
+  }
 
   fetch("{% url 'learning:submit_checkpoint_answer' %}", {
     method: 'POST',
@@ -477,7 +548,8 @@ function saveCheckpointAnswer(checkpointId, answer, responseTime, currentPositio
       session_id: SESSION_ID,
       response_time: responseTime,
       current_position: currentPosition,
-      content_type: 'video'
+      content_type: 'video',
+      session_duration: sessionDuration  // ✅ إرسال مدة الجلسة
     })
   })
   .then(function(r) { return r.json(); })
@@ -572,11 +644,20 @@ function findNearestCheckpointBeforeTime(currentTime) {
 function showCheckpointOnDistraction() {
   if (!videoElement || currentCheckpoint) return;
 
+  // ✅ فحص العتبة الزمنية قبل إظهار السؤال التكيفي
+  var videoDuration = videoElement.duration || 0;
+  var level1Window = Math.max(5, Math.min(55, videoDuration * 0.03)); // المستوى 1: 3% من مدة الجلسة
+
+  if (_probabilisticModel.totalDistractionTime < level1Window) {
+    console.log('[Checkpoint] Not showing checkpoint - distraction time below threshold:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Threshold:', level1Window.toFixed(2) + 's');
+    return;
+  }
+
   var currentTime = videoElement.currentTime;
   var checkpoint = findNearestCheckpointBeforeTime(currentTime);
 
   if (checkpoint) {
-    console.log('[Checkpoint] Showing checkpoint on distraction at time:', currentTime, 'nearest checkpoint:', checkpoint.video_timestamp);
+    console.log('[Checkpoint] Showing checkpoint on distraction at time:', currentTime, 'nearest checkpoint:', checkpoint.video_timestamp, 'Distraction time:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Threshold:', level1Window.toFixed(2) + 's');
     showCheckpointPopup(checkpoint);
   }
 }
@@ -617,6 +698,18 @@ var _attentionState = {
   maxConsecutiveDistractions: 5
 };
 
+// ✅ Probabilistic model for distraction tracking (three-level system)
+var _probabilisticModel = {
+  currentProbability: 0,
+  totalDistractionTime: 0, // الوقت المتواصل للتشتت
+  lastUpdateTime: null,
+  cognitiveSignal: 0,
+  disengagementLoad: 0,
+  // ✅ عداد الانتباه المستمر (لطلاب ADHD)
+  continuousAttentionTime: 0.0, // الوقت المتواصل للانتباه
+  sustainedAttentionThreshold: 2.5 // الحد الأدنى للانتباه المستمر قبل تصفير وقت التشتت (2.5 ثانية)
+};
+
 // Video state tracking
 var _videoState = {
   pausedBySystem: false,
@@ -630,7 +723,12 @@ var _alertState = {
   longAlertActive: false,
   audioPlaying: false,
   checkpointTimeout: null,
-  distractionStartTime: null
+  distractionStartTime: null,
+  checkpointShown: false, // ✅ علم لمنع تكرار ظهور سؤال التحقق (قديم)
+  // ✅ متغيرات جديدة للمستويات التسلسلية
+  level1CheckpointShown: false, // المستوى 1: 3% من مدة الجلسة
+  level2CheckpointShown: false, // المستوى 2: 15% من مدة الجلسة
+  level3CheckpointShown: false  // المستوى 3: 45% من مدة الجلسة
 };
 
 // Configuration
@@ -825,32 +923,56 @@ function onVideoEnded() {
 
 function startTracking() {
   console.log('[Attention] Starting tracking');
-  
-  fetch("{% url 'student:attention_start' %}", {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': CSRF_TOKEN
-    },
-    body: JSON.stringify({
-      lesson_id: LESSON_ID
-    })
+
+  // ✅ جلب بيانات المعايرة الشخصية قبل بدء التتبع
+  fetch("{% url 'learning:api_behavioral_baseline' %}", {
+    method: 'GET',
+    headers: {'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN}
   })
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    if (d.ok && d.ws_url) {
-      _savedWsUrl = d.ws_url;
-      trackingActive = true;
-      connectWebSocket(d.ws_url);
-      updateStatus('attentive', 'التتبع نشط ✅');
+  .then(function(r){ return r.json(); })
+  .then(function(baselineData){
+    if (baselineData.success && baselineData.has_baseline) {
+      console.log('[Baseline] Personalized baseline loaded:', baselineData);
     } else {
-      console.error('[Attention] Failed to start tracking:', d);
-      showAlert('فشل بدء تتبع الانتباه');
+      console.log('[Baseline] No active baseline found, using general thresholds');
+      // ✅ إظهار رسالة تحذيرية للمستخدم
+      var warningDiv = document.getElementById('baseline-warning');
+      if (warningDiv) {
+        warningDiv.style.display = 'block';
+      }
     }
   })
-  .catch(function(e) {
-    console.error('[Attention] Start tracking error:', e);
-    showAlert('تعذر الاتصال بخادم تتبع الانتباه');
+  .catch(function(e){
+    console.log('[Baseline] Failed to load baseline:', e);
+  })
+  .finally(function(){
+    // ✅ بدء التتبع بعد جلب المعايرة (أو فشل الجلب)
+    fetch("{% url 'student:attention_start' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN
+      },
+      body: JSON.stringify({
+        lesson_id: LESSON_ID
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok && d.ws_url) {
+        _savedWsUrl = d.ws_url;
+        trackingActive = true;
+        connectWebSocket(d.ws_url);
+        updateStatus('attentive', 'التتبع نشط ✅');
+      } else {
+        console.error('[Attention] Failed to start tracking:', d);
+        showAlert('فشل بدء تتبع الانتباه');
+      }
+    })
+    .catch(function(e) {
+      console.error('[Attention] Start tracking error:', e);
+      showAlert('تعذر الاتصال بخادم تتبع الانتباه');
+    });
   });
 }
 
@@ -907,12 +1029,19 @@ function stopTracking() {
 
 function connectWebSocket(wsUrl) {
   var normalized = normalizeWsUrl(wsUrl);
+  console.log('[Attention] Connecting to WebSocket:', wsUrl, '-> normalized:', normalized);
+  
   if (!normalized) {
     console.error('[Attention] Invalid ws_url:', wsUrl);
     return;
   }
   
-  ws = new WebSocket(normalized);
+  try {
+    ws = new WebSocket(normalized);
+  } catch (e) {
+    console.error('[Attention] Failed to create WebSocket:', e);
+    return;
+  }
   
   ws.onopen = function() {
     console.log('[Attention] WebSocket connected');
@@ -1002,6 +1131,30 @@ function stopFrameSending() {
   }
 }
 
+// ✅ دالة تحديث الاحتمال بناءً على الإشارات المعرفية (الأداء التفاعلي - 60%)
+// ✅ Gatekeeper: منع معالجة الإشارات المعرفية في المستوى 1 (3%)
+function updateCognitiveSignal(isCorrect, now) {
+  // ✅ حساب تقدم الجلسة (نسبة مئوية) بناءً على مدة الفيديو الفعلية
+  var videoDuration = videoElement ? videoElement.duration || 3600 : 3600; // مدة الفيديو الفعلية (أو 3600 ثانية افتراضياً)
+  var elapsedTime = videoElement ? videoElement.currentTime || 0 : 0; // الوقت المنقضي بالثواني
+  var sessionProgress = videoDuration > 0 ? (elapsedTime / videoDuration) : 0; // نسبة التقدم الفعلية
+
+  // ✅ Gatekeeper: منع معالجة الإشارات المعرفية في المستوى 1 (3%)
+  if (sessionProgress < 0.15) {
+    console.log('[Gatekeeper] Session progress < 15% (Level 1). Cognitive signals ignored. Progress:', (sessionProgress * 100).toFixed(1) + '%', 'Elapsed:', elapsedTime.toFixed(1) + 's', 'Total:', videoDuration.toFixed(1) + 's');
+    return; // ✅ تجاهل الإشارات المعرفية في المستوى 1
+  }
+
+  var signalChange = isCorrect ? -0.2 : 0.3; // إجابة صحيحة تقلل الاحتمال، خاطئة تزيده
+  _probabilisticModel.cognitiveSignal += signalChange;
+  _probabilisticModel.cognitiveSignal = Math.max(-1.0, Math.min(1.0, _probabilisticModel.cognitiveSignal));
+
+  // ✅ دمج الإشارة المعرفية في الاحتمال الكلي (وزن 60%)
+  _probabilisticModel.currentProbability = Math.max(0.0, Math.min(1.0, _probabilisticModel.currentProbability + signalChange * 0.6));
+
+  console.log('[Probabilistic] Cognitive signal updated (Interactive - 60%). Signal:', _probabilisticModel.cognitiveSignal.toFixed(3), 'Probability:', _probabilisticModel.currentProbability.toFixed(3));
+}
+
 function requestCameraAndStart() {
   var constraints = {
     video: {
@@ -1057,7 +1210,17 @@ function onCameraError(err) {
 function processAttentionState(s) {
   var now = Date.now();
   var attentive = !!s.is_attentive;
-  
+
+  // ✅ تحديث النموذج الاحتمالي لتتبع التشتت المتواصل
+  var timeSinceLastUpdate = _probabilisticModel.lastUpdateTime ? (now - _probabilisticModel.lastUpdateTime) / 1000 : 0.1;
+  _probabilisticModel.lastUpdateTime = now;
+
+  // ✅ حساب النوافذ الزمنية للمستويات الثلاثة بناءً على مدة الفيديو
+  var videoDuration = videoElement ? videoElement.duration || 0 : 0;
+  var level1Window = Math.max(5, Math.min(55, videoDuration * 0.03)); // المستوى 1: أدنى 5 ثواني، أو 3% من مدة الجلسة، حد أقصى 55 ثانية
+  var level2Window = Math.max(5, Math.min(180, videoDuration * 0.15)); // المستوى 2: أدنى 5 ثواني، أو 15% من مدة الجلسة، حد أقصى 3 دقائق (180 ثانية)
+  var level3Window = Math.max(15, Math.min(720, videoDuration * 0.45)); // المستوى 3: أدنى 15 ثانية، أو 45% من مدة الجلسة، حد أقصى 12 دقيقة (720 ثانية)
+
   if (!attentive) {
     // Student is distracted
     if (!_attentionState.distracted) {
@@ -1067,16 +1230,40 @@ function processAttentionState(s) {
       _attentionState.lastAlertLevel = null;
       console.log('[Attention] 😴 Distraction detected');
     }
-    
+
+    // ✅ تراكم وقت التشتت المتواصل
+    _probabilisticModel.totalDistractionTime += timeSinceLastUpdate;
+
     // Calculate duration of current distraction
     var duration = (now - (_attentionState.startTime || now)) / 1000;
     var newLevel = duration >= 10 ? 'severe' : duration >= 7 ? 'medium' : duration >= 5 ? 'short' : 'none';
     _attentionState.level = newLevel;
-    
-    // Handle alert based on duration
+
+    // ✅ منطق تسلسلي للمستويات الثلاثة (للإشعارات فقط، وليس لظهور الأسئلة التكيفية)
+    // المستوى 1: 3% من مدة الجلسة
+    if (_probabilisticModel.totalDistractionTime >= level1Window && !_alertState.level1CheckpointShown) {
+      console.log('[Distraction] Level 1 threshold reached (3% of session). Total distraction time:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Window:', level1Window.toFixed(2) + 's');
+      _alertState.level1CheckpointShown = true;
+    }
+
+    // المستوى 2: 15% من مدة الجلسة (بعد المستوى 1)
+    if (_probabilisticModel.totalDistractionTime >= level2Window && _alertState.level1CheckpointShown && !_alertState.level2CheckpointShown) {
+      console.log('[Distraction] Level 2 threshold reached (15% of session). Total distraction time:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Window:', level2Window.toFixed(2) + 's');
+      _alertState.level2CheckpointShown = true;
+    }
+
+    // المستوى 3: 45% من مدة الجلسة (بعد المستوى 2)
+    if (_probabilisticModel.totalDistractionTime >= level3Window && _alertState.level2CheckpointShown && !_alertState.level3CheckpointShown) {
+      console.log('[Distraction] Level 3 threshold reached (45% of session). Total distraction time:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Window:', level3Window.toFixed(2) + 's');
+      _alertState.level3CheckpointShown = true;
+      // ✅ إرسال إشعارات للمعلم وولي الأمر (فقط عند المستوى 3)
+      sendLevel3Notifications();
+    }
+
+    // Handle alert based on duration (disabled)
     handleDistractionLevel(_attentionState.level, duration);
-    
-    // Update status bar
+
+    // Update status bar (disabled)
     updateStatus('distracted', 'مشتت (' + Math.round(duration) + 's)');
   } else {
     // Student is attentive
@@ -1085,13 +1272,23 @@ function processAttentionState(s) {
       console.log('[Attention] 👁️ Attention regained');
       onAttentiveDetected();
     }
-    
+
     _attentionState.distracted = false;
     _attentionState.level = 'none';
     _attentionState.startTime = null;
     _attentionState.lastAlertLevel = null;
-    
-    // Update status bar
+
+    // ✅ تراكم وقت الانتباه المستمر (لطلاب ADHD)
+    _probabilisticModel.continuousAttentionTime += timeSinceLastUpdate;
+
+    // ✅ تصفير وقت التشتت فقط بعد انتباه مستمر لمدة 2.5 ثانية
+    if (_probabilisticModel.continuousAttentionTime >= _probabilisticModel.sustainedAttentionThreshold) {
+      _probabilisticModel.totalDistractionTime = 0;
+      _probabilisticModel.continuousAttentionTime = 0;
+      console.log('[Probabilistic] Sustained attention detected (2.5s). Distraction time reset to 0');
+    }
+
+    // Update status bar (disabled)
     updateStatus('attentive', 'مركز ✅');
   }
 }
@@ -1100,18 +1297,21 @@ function handleDistractionLevel(level, duration) {
   if (_attentionState.lastAlertLevel === level) return;
   _attentionState.lastAlertLevel = level;
 
-  if (level === 'short' && duration >= 5 && duration < 7) {
-    showShortAlert();
-  } else if (level === 'medium' && duration >= 7 && duration < 10) {
-    showLongAlert();
-  } else if (level === 'severe' && duration >= 10) {
-    showSevereAlert();
-    
-    // Start 10-second timer for checkpoint
+  // ✅ تعطيل نوافذ التنبيه للتشتت - الحفاظ على سؤال التحقق فقط
+  // if (level === 'short' && duration >= 5 && duration < 7) {
+  //   showShortAlert();
+  // } else if (level === 'medium' && duration >= 7 && duration < 10) {
+  //   showLongAlert();
+  // } else if (level === 'severe' && duration >= 10) {
+  //   showSevereAlert();
+  // }
+
+  // Start 10-second timer for checkpoint (severe distraction only)
+  if (level === 'severe' && duration >= 10) {
     if (!_alertState.checkpointTimeout && !_alertState.distractionStartTime) {
       _alertState.distractionStartTime = Date.now();
       console.log('[Attention] Starting 10-second timer for checkpoint');
-      
+
       _alertState.checkpointTimeout = setTimeout(function() {
         console.log('[Attention] 10-second timer elapsed, showing checkpoint');
         showCheckpointOnDistraction();
@@ -1207,23 +1407,23 @@ function showSevereAlert() {
 
 function onAttentiveDetected() {
   console.log('[Attention] ✅ Student is attentive - stopping alerts');
-  
+
   // Stop audio alert immediately
   cancelAllAlerts();
   console.log('[Attention] Audio alerts cancelled');
-  
+
   // Hide visual alerts
   var alertElement = document.getElementById('attentionAlert');
   if (alertElement) {
     alertElement.classList.remove('show');
     console.log('[Attention] Visual alerts hidden');
   }
-  
+
   // Reset alert flags
   _alertState.longAlertActive = false;
   _alertState.shortAlertShown = false;
   _alertState.audioPlaying = false;
-  
+
   // Cancel checkpoint timer if active
   if (_alertState.checkpointTimeout) {
     clearTimeout(_alertState.checkpointTimeout);
@@ -1231,22 +1431,50 @@ function onAttentiveDetected() {
     _alertState.distractionStartTime = null;
     console.log('[Attention] Checkpoint timer cancelled due to focus return');
   }
-  
+
   // Auto-resume video if paused by system
   if (videoElement && videoElement.paused && _videoState.pausedBySystem) {
     console.log('[Attention] Resuming video after focus returned');
     _videoState.pausedBySystem = false;
     _videoState.wasPlayingBeforeDistraction = true;
-    
+
     videoElement.play().catch(function(e) {
       console.error('[Attention] Error resuming video:', e);
     });
   }
-  
+
   // Reset distraction tracking
   resetAttentionState();
-  
+
   console.log('[Attention] 🔄 Ready for new attention/distraction cycle');
+}
+
+// ✅ إرسال إشعارات للمعلم وولي الأمر (المستوى 3 فقط)
+function sendLevel3Notifications() {
+  console.log('[Level 3] Sending notifications to teacher and parent');
+
+  // إرسال إشعار للمعلم وولي الأمر
+  fetch('/api/send_level3_notification/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      lesson_id: LESSON_ID,
+      session_id: SESSION_ID,
+      lesson_type: 'video', // نوع الجلسة (فيديو)
+      lesson_title: '{{ lesson.lessontitle|default:"الدرس" }}'
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('[Level 3] Notifications sent successfully:', data);
+  })
+  .catch(error => {
+    console.error('[Level 3] Error sending notifications:', error);
+  });
 }
 
 function resetAttentionState() {
@@ -1269,22 +1497,8 @@ function clearAlerts() {
 // ══════════════════════════════════════════════════════════════
 
 function updateStatus(state, text) {
-  var statusElement = document.getElementById('attentionStatus');
-  var statusIndicator = document.getElementById('statusIndicator');
-  var statusText = document.getElementById('statusText');
-  
-  if (!statusElement || !statusIndicator || !statusText) return;
-  
-  statusElement.style.display = 'flex';
-  statusText.textContent = text;
-  
-  if (state === 'attentive') {
-    statusIndicator.className = 'status-indicator attentive';
-  } else if (state === 'distracted') {
-    statusIndicator.className = 'status-indicator distracted';
-  } else {
-    statusIndicator.className = 'status-indicator';
-  }
+  // ✅ تعطيل عرض رسائل الحالة (مشتت/مركز) - الحفاظ على سؤال التحقق فقط
+  return;
 }
 
 function toggleAttentionTracking() {
@@ -1304,22 +1518,9 @@ function toggleAttentionTracking() {
 }
 
 function showAlert(msg) {
-  var toast = document.getElementById('alert-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'alert-toast';
-    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
-      'background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;padding:12px 24px;' +
-      'border-radius:12px;font-weight:700;z-index:10000;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.2);';
-    document.body.appendChild(toast);
-  }
-  
-  toast.textContent = msg;
-  toast.style.display = 'block';
-  
-  setTimeout(function() {
-    toast.style.display = 'none';
-  }, 5000);
+  // ✅ تعطيل رسائل التنبيه العامة - الحفاظ على سؤال التحقق فقط
+  // يمكن إعادة تفعيلها لرسائل الخطأ المهمة إذا لزم الأمر
+  return;
 }
 
 // ══════════════════════════════════════════════════════════════
