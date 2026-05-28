@@ -413,7 +413,8 @@ var _sessionState = {
     lastLevel2TriggerTime: 0, // وقت آخر ظهور للمستوى 2
     level3PopupShown: false, // هل تم إظهار نافذة المستوى 3
     level3NotificationSent: false, // هل تم إرسال إشعار المستوى 3
-    distractionTimerPaused: false // ✅ هل تم إيقاف عداد التشتت بسبب نافذة مفتوحة
+    distractionTimerPaused: false, // ✅ هل تم إيقاف عداد التشتت بسبب نافذة مفتوحة
+    lastLevel2Threshold: 0 // ✅ آخر عتبة تم الوصول إليها للمستوى الثاني (15%، 30%، 45%، إلخ)
 };
 var _sessionStartTime = null; // ✅ وقت بدء الجلسة الفعلي (سيتم تعيينه عند بدء الصوت)
 var _lessonStartTime = Date.now(); // وقت تحميل الصفحة (للمعلومات فقط)
@@ -1384,17 +1385,14 @@ function feedbackForDistractionLevel(level, s, duration) {
         }
     }
 
-    // ✅ منطق المستوى الثاني: نافذة توجيهية عند 15% مع فاصل زمني ديناميكي (6-30 ثانية)
+    // ✅ منطق المستوى الثاني: نافذة توجيهية تظهر كل 15% من مدة الجلسة (15%، 30%، 45%، إلخ)
     if (targetLevel === 2) {
-        var now = Date.now();
-        var timeSinceLastLevel2 = now - (_sessionState.lastLevel2TriggerTime || 0);
-        var dynamicInterval = calculateDynamicInterval(_probabilisticModel.totalDistractionTime, sessionDuration, 2);
-        
-        // إظهار فقط إذا مر الفاصل الزمني الديناميكي
-        if (timeSinceLastLevel2 > (dynamicInterval * 1000) || !_sessionState.lastLevel2TriggerTime) {
-            console.log('[Popup] Level 2 threshold reached (15% of session). Showing AI Assistant popup.');
+        var currentThreshold = Math.floor(_probabilisticModel.totalDistractionTime / (sessionDuration * 0.15)) * 0.15;
+
+        if (currentThreshold > _sessionState.lastLevel2Threshold) {
+            console.log('[Popup] Level 2 threshold reached (' + (currentThreshold * 100) + '% of session). Showing AI Assistant popup.');
             showPopupByLevel(2, currentParagraphIndex);
-            _sessionState.lastLevel2TriggerTime = now;
+            _sessionState.lastLevel2Threshold = currentThreshold;
         }
     }
 
