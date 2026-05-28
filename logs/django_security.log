@@ -25671,3 +25671,33 @@ DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
 ERROR 2026-05-28 16:14:37,124 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
 DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
 
+ERROR 2026-05-28 16:29:16,710 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:16,976 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:17,283 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:17,587 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:17,884 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:18,184 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:18,490 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:18,782 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:19,079 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
+ERROR 2026-05-28 16:29:19,380 learning_state_updater Error creating snapshot for session 167: insert or update on table "LearningStateSnapshot" violates foreign key constraint "LearningStateSnapsho_SessionID_fb690b85_fk_LearningS"
+DETAIL:  Key (SessionID)=(167) is not present in table "LearningSession".
+
