@@ -1762,6 +1762,22 @@ function updateBehavioralDisengagementProbability(attentive, score, elapsedSecon
 function processAttentionState(s) {
   var now = Date.now();
   var attentive = !!s.is_attentive;
+  var isDrowsy = !!s.is_drowsy; // ✅ إضافة التحقق من is_drowsy
+
+  // ✅ التعامل مع حالة النعاس
+  if (isDrowsy) {
+    var fn = STUDENT_NAME || 'صديقي';
+    var message = fn + '، يبدو أنك مرهق، إذا كنت تشعر بالنعاس ننصحك بأخذ استراحة قصيرة.';
+    // تشغيل TTS للرسالة
+    speakDrowsyMessageVideo(message);
+    // إظهار نافذة الاستراحة
+    showDrowsyModalVideo(fn);
+    // إيقاف الفيديو مؤقتاً
+    if (videoElement) {
+      videoElement.pause();
+      _videoState.pausedBySystem = true;
+    }
+  }
 
   // ✅ تحديث النموذج الاحتمالي لتتبع التشتت المتواصل
   var timeSinceLastUpdate = _probabilisticModel.lastUpdateTime ? (now - _probabilisticModel.lastUpdateTime) / 1000 : 0.1;
@@ -2089,6 +2105,134 @@ function showAlert(msg) {
   // يمكن إعادة تفعيلها لرسائل الخطأ المهمة إذا لزم الأمر
   return;
 }
+
+// ══════════════════════════════════════════════════════════════
+// وظائف التعامل مع النعاس والاستراحة القصيرة (للجلسة الفيديوية)
+// ══════════════════════════════════════════════════════════════
+
+// ✅ دالة TTS للرسالة المسموعة
+function speakDrowsyMessageVideo(message) {
+  if ('speechSynthesis' in window) {
+    // إيقاف أي صوت قيد التشغيل
+    window.speechSynthesis.cancel();
+    
+    var utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = 'ar-SA';
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+// ✅ دالة إظهار نافذة الاستراحة
+function showDrowsyModalVideo(studentName) {
+  // التحقق من أن النافذة ليست مفتوحة بالفعل
+  if (document.getElementById('drowsy-modal-video')) {
+    return;
+  }
+  
+  var modal = document.createElement('div');
+  modal.id = 'drowsy-modal-video';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    direction: rtl;
+  `;
+  
+  modal.innerHTML = `
+    <div style="
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    ">
+      <h2 style="color: #f59e0b; margin-bottom: 20px; font-size: 24px;">⚠️ تنبيه</h2>
+      <p style="color: #1e293b; font-size: 18px; margin-bottom: 25px; line-height: 1.6;">
+        ${studentName}، يبدو أنك مرهق.<br>
+        إذا كنت تشعر بالنعاس ننصحك بأخذ استراحة قصيرة.
+      </p>
+      <div style="display: flex; gap: 15px; justify-content: center;">
+        <button id="take-break-btn-video" style="
+          background: #f59e0b;
+          color: white;
+          border: none;
+          padding: 12px 30px;
+          border-radius: 8px;
+          font-size: 16px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: background 0.3s;
+        " onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">
+          أخذ استراحة قصيرة
+        </button>
+        <button id="continue-btn-video" style="
+          background: #64748b;
+          color: white;
+          border: none;
+          padding: 12px 30px;
+          border-radius: 8px;
+          font-size: 16px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: background 0.3s;
+        " onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#64748b'">
+          المتابعة
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // إضافة مستمعي الأحداث للأزرار
+  document.getElementById('take-break-btn-video').addEventListener('click', function() {
+    // إيقاف TTS
+    window.speechSynthesis.cancel();
+    // الخروج من الدرس
+    exitLessonForBreakVideo();
+  });
+  
+  document.getElementById('continue-btn-video').addEventListener('click', function() {
+    // إيقاف TTS
+    window.speechSynthesis.cancel();
+    // إغلاق النافذة
+    document.body.removeChild(modal);
+    // إعادة تشغيل الفيديو
+    if (videoElement) {
+      videoElement.play();
+      _videoState.pausedBySystem = false;
+    }
+  });
+}
+
+// ✅ دالة الخروج من الدرس لأخذ استراحة
+function exitLessonForBreakVideo() {
+  // إيقاف تتبع الانتباه
+  if (typeof stopTracking === 'function') {
+    stopTracking();
+  }
+  
+  // إيقاف الفيديو
+  if (videoElement) {
+    videoElement.pause();
+  }
+  
+  // إعادة توجيه إلى صفحة الدروس
+  window.location.href = "{% url 'student:student_home' %}";
+}
+
 
 // ══════════════════════════════════════════════════════════════
 // Initialization

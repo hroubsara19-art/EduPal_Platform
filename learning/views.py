@@ -849,6 +849,23 @@ def simplify_lesson(request):
     subjects   = Subject.objects.filter(teacherid=teacher).select_related('classid')
     my_classes = Class.objects.filter(subject__teacherid=teacher).distinct()
  
+    # قائمة مولدات الصور المتاحة (قابلة للتعديل عبر settings)
+    ai_image_generators = getattr(settings, 'AI_IMAGE_GENERATORS', {
+        'craiyon': {
+            'name': 'Craiyon',
+            'url': 'https://www.craiyon.com/en',
+        },
+        'canva': {
+            'name': 'Canva Image Generator',
+            'url': 'https://www.canva.com/photos/create/',
+        },
+        'nightcafe': {
+            'name': 'NightCafe Creator',
+            'url': 'https://creator.nightcafe.studio',
+        },
+    })
+    default_ai_generator = getattr(settings, 'DEFAULT_AI_IMAGE_GENERATOR', 'canva')
+
     # ✅ إصلاح: حساب remaining و has_personal_key هنا
     # يُرسلان للقالب عند كل render لعرض الحصة الصحيحة
     remaining        = max(0, teacher.daily_lesson_limit - teacher.lessons_today)
@@ -862,6 +879,9 @@ def simplify_lesson(request):
             'role':             role,
             'remaining':        remaining,         # ✅ الحصة الصحيحة
             'has_personal_key': has_personal_key,  # ✅ هل عنده مفتاح شخصي
+            'ai_image_generators': ai_image_generators,
+            'default_ai_generator': default_ai_generator,
+            'default_ai_generator_url': ai_image_generators.get(default_ai_generator, {}).get('url', next(iter(ai_image_generators.values()))['url']),
         }
         if extra_ctx:
             ctx.update(extra_ctx)

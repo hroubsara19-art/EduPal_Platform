@@ -47,6 +47,7 @@
   <form method="POST" id="aiGenerateForm" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
     <input type="hidden" name="image_source" id="image_source_field" value="upload">
+    <input type="hidden" name="image_generator" id="image_generator_field" value="{{ default_ai_generator }}">
 
     <!-- ── إرشادات المعلم ──────────────────────────────────────── -->
     <div class="ul-guide-card" id="guideCard">
@@ -187,6 +188,22 @@
             <button type="button" class="ul-del-btn d-none" id="del_{{ i }}"><i class="fas fa-times"></i></button>
           </div>
           {% endfor %}
+        </div>
+        <!-- اختيار مولد الصور بالذكاء الاصطناعي -->
+        <div class="ul-ai-gen" style="margin-top:12px;">
+          <div class="ul-ai-gen-row">
+            <select id="ai-generator-select" class="ul-ai-gen-select" aria-label="اختر مولد الصور">
+              {% for key, gen in ai_image_generators.items %}
+                <option value="{{ gen.url }}" data-key="{{ key }}" {% if key == default_ai_generator %}selected{% endif %}>{{ gen.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="ul-ai-gen-btn" id="aiGenBtn" onclick="openAiGenerator()">
+              <i class="fas fa-image"></i>&nbsp; فتح المولد
+            </button>
+          </div>
+          <div class="ul-ai-gen-note" style="margin-top:6px;color:var(--muted);font-size:.86rem;">
+            اختر مولداً ثم انقر لفتح نافذة جديدة؛ بعد إنشاء الصورة قم بتحميلها هنا.
+          </div>
         </div>
         <div class="ul-img-min-warn d-none" id="img-min-warn">
           <i class="fas fa-exclamation-triangle"></i>
@@ -415,6 +432,14 @@ body{background:var(--bg);font-family:'Cairo','Tajawal',sans-serif;color:var(--i
 .ul-del-btn:hover{background:#b91c1c;transform:scale(1.1);}
 .ul-img-min-warn{margin-top:.85rem;background:#fffbeb;border:1.5px solid #fde68a;border-radius:.65rem;padding:.75rem 1rem;font-family:'Tajawal',sans-serif;font-size:.88rem;color:#92400e;display:flex;align-items:center;gap:.5rem;}
 
+/* زر مولد الصور بالذكاء الاصطناعي */
+.ul-ai-gen{display:flex;flex-direction:column;align-items:flex-start;}
+.ul-ai-gen-row{display:flex;gap:.75rem;align-items:center;}
+.ul-ai-gen-select{padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:.65rem;background:#fff;min-width:220px;font-family:'Cairo',sans-serif;font-size:.95rem;color:var(--ink);}
+.ul-ai-gen-btn{background:linear-gradient(90deg,var(--amber),#f59e0b);color:#081029;border:none;padding:.55rem .9rem;border-radius:10px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(245,158,11,.18);display:inline-flex;align-items:center;gap:.6rem;}
+.ul-ai-gen-btn:hover{transform:translateY(-2px)}
+.ul-ai-gen-note{max-width:720px}
+
 /* ── Generate Card ── */
 .ul-card-generate{background:linear-gradient(135deg,#f0f9ff 0%,#eff6ff 100%);border-color:var(--blue-bd);}
 .ul-generate-inner{display:flex;align-items:center;justify-content:space-between;gap:2rem;}
@@ -633,6 +658,26 @@ function updateImageCount() {
     counter.style.background  = imageCount === 0 ? '#fef2f2' : '';
     counter.style.borderColor = imageCount === 0 ? '#fecaca' : '';
     counter.style.color       = imageCount === 0 ? '#dc2626' : '';
+  }
+}
+
+function openAiGenerator() {
+  const sel = document.getElementById('ai-generator-select');
+  let url = "{{ default_ai_generator_url|escapejs }}";
+  let key = "{{ default_ai_generator|escapejs }}";
+  if (sel) {
+    const opt = sel.options[sel.selectedIndex];
+    url = opt ? opt.value : url;
+    key = opt ? (opt.getAttribute('data-key') || opt.value) : key;
+  }
+  try {
+    window.open(url, '_blank', 'noopener');
+    const fld = document.getElementById('image_source_field');
+    if (fld) fld.value = 'ai';
+    const genFld = document.getElementById('image_generator_field');
+    if (genFld) genFld.value = key;
+  } catch (e) {
+    alert('تعذر فتح مولد الصور — يرجى نسخ الرابط يدوياً: ' + url);
   }
 }
 

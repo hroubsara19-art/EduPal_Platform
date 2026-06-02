@@ -970,13 +970,25 @@ function updateDistractionBanner(s){
     if (!el) return;
     var level = String(s.distraction_level || 'none').toLowerCase();
     var focusStatus = String(s.focus_status || '').toLowerCase();
-    var shouldShow = !s.is_attentive || level !== 'none' || focusStatus !== 'focused' || !!s.alert_message;
+    var isDrowsy = !!s.is_drowsy;
+    // ✅ إضافة تحقق مباشر من is_drowsy
+    var shouldShow = !s.is_attentive || level !== 'none' || focusStatus !== 'focused' || !!s.alert_message || isDrowsy;
     if (!shouldShow) {
         clearDistractionBanner();
         return;
     }
 
-    el.textContent = s.alert_message || distractionBannerText(s);
+    // ✅ إذا كان is_drowsy، استخدم رسالة واضحة للنعاس
+    if (isDrowsy) {
+        var fn = firstAttentionName(s.student_name || '') || 'صديقي';
+        el.textContent = fn + '، يبدو أنك مرهق، إذا كنت تشعر بالنعاس ننصحك بأخذ استراحة قصيرة.';
+        // ✅ تشغيل TTS للرسالة
+        speakDrowsyMessage(fn + '، يبدو أنك مرهق، إذا كنت تشعر بالنعاس ننصحك بأخذ استراحة قصيرة.');
+        // ✅ إظهار نافذة الاستراحة
+        showDrowsyModal(fn);
+    } else {
+        el.textContent = s.alert_message || distractionBannerText(s);
+    }
     el.style.display = 'block';
 
     if (level === 'high') {
@@ -2957,6 +2969,130 @@ global.WordHighlight = {
     },
 };
 })(window);
+
+// ══════════════════════════════════════════════════════════════
+// وظائف التعامل مع النعاس والاستراحة القصيرة
+// ══════════════════════════════════════════════════════════════
+
+// ✅ دالة TTS للرسالة المسموعة
+function speakDrowsyMessage(message) {
+    if ('speechSynthesis' in window) {
+        // إيقاف أي صوت قيد التشغيل
+        window.speechSynthesis.cancel();
+        
+        var utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'ar-SA';
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
+// ✅ دالة إظهار نافذة الاستراحة
+function showDrowsyModal(studentName) {
+    // التحقق من أن النافذة ليست مفتوحة بالفعل
+    if (document.getElementById('drowsy-modal')) {
+        return;
+    }
+    
+    var modal = document.createElement('div');
+    modal.id = 'drowsy-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        direction: rtl;
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        ">
+            <h2 style="color: #f59e0b; margin-bottom: 20px; font-size: 24px;">⚠️ تنبيه</h2>
+            <p style="color: #1e293b; font-size: 18px; margin-bottom: 25px; line-height: 1.6;">
+                ${studentName}، يبدو أنك مرهق.<br>
+                إذا كنت تشعر بالنعاس ننصحك بأخذ استراحة قصيرة.
+            </p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="take-break-btn" style="
+                    background: #f59e0b;
+                    color: white;
+                    border: none;
+                    padding: 12px 30px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    transition: background 0.3s;
+                " onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">
+                    أخذ استراحة قصيرة
+                </button>
+                <button id="continue-btn" style="
+                    background: #64748b;
+                    color: white;
+                    border: none;
+                    padding: 12px 30px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    transition: background 0.3s;
+                " onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#64748b'">
+                    المتابعة
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // إضافة مستمعي الأحداث للأزرار
+    document.getElementById('take-break-btn').addEventListener('click', function() {
+        // إيقاف TTS
+        window.speechSynthesis.cancel();
+        // الخروج من الدرس
+        exitLessonForBreak();
+    });
+    
+    document.getElementById('continue-btn').addEventListener('click', function() {
+        // إيقاف TTS
+        window.speechSynthesis.cancel();
+        // إغلاق النافذة
+        document.body.removeChild(modal);
+    });
+}
+
+// ✅ دالة الخروج من الدرس لأخذ استراحة
+function exitLessonForBreak() {
+    // إيقاف تتبع الانتباه
+    if (typeof stopAttentionTracking === 'function') {
+        stopAttentionTracking();
+    }
+    
+    // إيقاف الفيديو/الصوت
+    var video = document.querySelector('video');
+    var audio = document.querySelector('audio');
+    if (video) video.pause();
+    if (audio) audio.pause();
+    
+    // إعادة توجيه إلى صفحة الدروس
+    window.location.href = '/student/lessons/';
+}
+
 </script>
 
 {% include 'student_app/chatbot_widget_js.html' %}

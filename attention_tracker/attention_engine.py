@@ -37,12 +37,12 @@ POSE_HEAD_RATIO_MIN = 0.62
 POSE_HEAD_RATIO_MAX = 1.38
 
 # EAR — نسبة انفتاح العين (ويب: JPEG منخفض + ~3 إطارات/ث → تنعيم مطلوب)
-EAR_THRESHOLD       = 0.22   # للمسار التدريجي (مع عدّ الإطارات)
-FOCUSBUDDY_EAR_THRESHOLD = 0.22  # عتبة صارمة سريعة
-EAR_SOFT_THRESHOLD  = 0.30   # مع streak يُفعّل «وضع نعاس» للتنبيهات
-EAR_CLOSED_STREAK   = 3      # إطارات متتالية منخفضة EAR → تفعيل وضع النعاس
-EAR_OPEN_STREAK     = 3      # إطارات مفتوحة لتصفير وضع النعاس
-EAR_CONSEC_FRAMES   = 12     # إطار متتالي تحت الحد → نعاس (مسار دقّة إضافي)
+EAR_THRESHOLD       = 0.20   # ✅ تغيير العتبة إلى 0.20 كما في المثال المطلوب
+FOCUSBUDDY_EAR_THRESHOLD = 0.20  # ✅ تغيير العتبة إلى 0.20 كما في المثال المطلوب
+EAR_SOFT_THRESHOLD  = 0.35   # مع streak يُفعّل «وضع نعاس» للتنبيهات - زيادة حساسية
+EAR_CLOSED_STREAK   = 2      # إطارات متتالية منخفضة EAR → تفعيل وضع النعاس - تخفيض
+EAR_OPEN_STREAK     = 2      # إطارات مفتوحة لتصفير وضع النعاس - تخفيض
+EAR_CONSEC_FRAMES   = 8      # إطار متتالي تحت الحد → نعاس (مسار دقّة إضافي) - تخفيض
 
 # Gaze — موقع البؤبؤ داخل العين
 GAZE_LEFT_RATIO     = 0.33
@@ -94,8 +94,8 @@ ALERT_COOLDOWN = DISTRACTION_THRESHOLD_SECONDS
 ATTENTIVE_RESET_STREAK = 8  # زيادة من 5 إطارات
 
 # نقاط Face Mesh
-LEFT_EYE   = [362, 385, 387, 263, 373, 380]
-RIGHT_EYE  = [33,  160, 158, 133, 153, 144]
+LEFT_EYE   = [33, 160, 158, 133, 153, 144]  # ✅ تصحيح النقاط كما في المثال المطلوب
+RIGHT_EYE  = [362, 385, 387, 263, 373, 380]  # ✅ تصحيح النقاط كما في المثال المطلوب
 LEFT_IRIS  = [474, 475, 476, 477]
 RIGHT_IRIS = [469, 470, 471, 472]
 
@@ -960,7 +960,7 @@ class AttentionTracker:
         now = time.time()
         ratio_pose, pose_distracted = compute_pose_focusbuddy_ratio(pose_results)
 
-        ear = 0.35
+        ear = 0.20  # ✅ تخفيض القيمة الافتراضية لجعل النظام أكثر حساسية للنعاس
         face_ratio = 1.0
         gaze_zone = "unknown"
         # ══════════════════════════════════════════════════════════════
@@ -999,28 +999,9 @@ class AttentionTracker:
             
             self._last_face_seen = time.time()  # ✅ تحديث وقت آخر مرة رأينا فيها الوجه
 
-            if ear < EAR_SOFT_THRESHOLD:
-                self._closed_ear_streak = min(self._closed_ear_streak + 1, 30)
-                self._open_ear_streak = 0
-            else:
-                self._open_ear_streak = min(self._open_ear_streak + 1, 30)
-                self._closed_ear_streak = max(0, self._closed_ear_streak - 1)
-
-            if ear < FOCUSBUDDY_EAR_THRESHOLD or self._closed_ear_streak >= EAR_CLOSED_STREAK:
-                self._drowse_active = True
-                # ✅ نظام إغماض العينين
-                if self._eye_closure_start is None:
-                    self._eye_closure_start = time.time()
-            if self._open_ear_streak >= EAR_OPEN_STREAK:
-                self._drowse_active = False
-                # ✅ إعادة تعيين عداد إغماض العينين عند فتح العينين
-                if self._eye_closure_start is not None:
-                    closure_duration = time.time() - self._eye_closure_start
-                    if closure_duration >= self._eye_closure_threshold:
-                        self._eye_closure_count += 1
-                    self._eye_closure_start = None
-
-            drowsy_instant = self._drowse_active
+            # ✅ تبسيط منطق النعاس كما في المثال المطلوب
+            # المنطق: إذا كانت نسبة انفتاح العين EAR أقل من 0.20 — أي العين شبه مغلقة — يُعتبر الطالب مشتتاً
+            drowsy_instant = (ear < FOCUSBUDDY_EAR_THRESHOLD)
         else:
             self._closed_ear_streak = 0
             self._open_ear_streak = 0
@@ -1032,35 +1013,32 @@ class AttentionTracker:
             score = 25
             cause = "head_turn"
             attentive = False
-            if ear < EAR_THRESHOLD:
-                self._ear_counter += 1
-            else:
-                self._ear_counter = 0
-            drowsy_long = self._ear_counter >= EAR_CONSEC_FRAMES
-            drowsy = drowsy_long or drowsy_instant
+            # ✅ تبسيط منطق النعاس كما في المثال المطلوب
+            drowsy = drowsy_instant
+            # ✅ إذا كان drowsy، تغيير السبب إلى drowsy
+            if drowsy:
+                cause = "drowsy"
         elif face_lm is not None and drowsy_instant:
             display_ratio = face_ratio
             score = 25
             cause = "drowsy"
             attentive = False
-            self._ear_counter = min(self._ear_counter + 1, EAR_CONSEC_FRAMES + 5)
             drowsy = True
         elif face_lm is None:
             display_ratio = ratio_pose if ratio_pose is not None else 1.0
             # ✅ عدم وجود الوجه يُعتبر تشتتاً فورياً مع درجة خطورة أعلى
             # (حالة no_face أعلى خطورة من غيرها من حالات التشتت)
             score, cause, attentive = 0, "no_face", False
-            self._ear_counter = 0
             drowsy = False
         else:
-            if ear < EAR_THRESHOLD:
-                self._ear_counter += 1
-            else:
-                self._ear_counter = 0
-            drowsy_long = self._ear_counter >= EAR_CONSEC_FRAMES
+            # ✅ تبسيط منطق النعاس كما في المثال المطلوب
+            drowsy = drowsy_instant
+            # ✅ إذا كان drowsy، تغيير السبب إلى drowsy
+            if drowsy:
+                cause = "drowsy"
             # ✅ استخدام compute_score المحسّن مع المعاملات الجديدة
             score, cause = compute_score(
-                ear, face_ratio, gaze_zone, drowsy_long,
+                ear, face_ratio, gaze_zone, drowsy,
                 head_yaw, head_pitch, head_roll,
                 gaze_h_angle, gaze_v_angle,
                 looking_away
@@ -1069,10 +1047,9 @@ class AttentionTracker:
             if score == 90 or score == 0:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Score is {score} - ear={ear:.3f}, face_ratio={face_ratio:.3f}, gaze={gaze}, drowsy={drowsy_long}, head_yaw={head_yaw:.2f}, head_pitch={head_pitch:.2f}, head_roll={head_roll:.2f}, gaze_h={gaze_h_angle:.2f}, gaze_v={gaze_v_angle:.2f}, looking_away={looking_away}")
+                logger.warning(f"Score is {score} - ear={ear:.3f}, face_ratio={face_ratio:.3f}, gaze={gaze}, drowsy={drowsy}, head_yaw={head_yaw:.2f}, head_pitch={head_pitch:.2f}, head_roll={head_roll:.2f}, gaze_h={gaze_h_angle:.2f}, gaze_v={gaze_v_angle:.2f}, looking_away={looking_away}")
             attentive = score >= 68
             display_ratio = face_ratio
-            drowsy = drowsy_long
 
         alert, distract_dur, warning, significant = self._track_distraction(
             attentive, cause, score, now
@@ -1243,7 +1220,7 @@ class AttentionTracker:
 
             # حساب السكور باستخدام الخوارزمية المحسّنة
             # نستخدم قيم افتراضية لأننا لا نملك بيانات MediaPipe هنا
-            ear = 0.3  # قيمة افتراضية للعين
+            ear = 0.20  # ✅ تخفيض القيمة الافتراضية لجعل النظام أكثر حساسية للنعاس
             ratio = 1.0  # قيمة افتراضية للنسبة
             gaze = "center"  # قيمة افتراضية للنظر
             drowsy = False
