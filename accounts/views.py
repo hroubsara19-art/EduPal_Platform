@@ -4,7 +4,7 @@ accounts/views.py — محسّن بالأمان
 import logging, os, re, traceback
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.middleware.csrf import rotate_token
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from .main_forms import RegistrationForm
 from .info_forms import StudentProfileForm, TeacherProfileForm, ParentProfileForm
@@ -137,7 +138,7 @@ def signup_view(request):
                     # إنشاء رمز التحقق من 8 خانات
                     verification_code = ''.join(random.choices(string.digits, k=8))
                     user.email_verification_code = verification_code
-                    user.email_verification_sent_at = datetime.now()
+                    user.email_verification_sent_at = timezone.now()
                     user.save()
                     
                     # إرسال الإيميل
@@ -227,7 +228,7 @@ def verify_email_view(request):
         
         # التحقق من انتهاء صلاحية الرمز (30 دقيقة)
         if user.email_verification_sent_at:
-            time_diff = datetime.now() - user.email_verification_sent_at
+            time_diff = timezone.now() - user.email_verification_sent_at
             if time_diff > timedelta(minutes=30):
                 messages.error(request, 'رمز التحقق منتهي الصلاحية. يرجى طلب رمز جديد.')
                 return render(request, 'accounts/verify_email.html', {'email': email})
