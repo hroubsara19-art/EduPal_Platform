@@ -1,0 +1,661 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إعداد تجربة الواقع الافتراضي — {{ lesson.lessontitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --purple: #7c3aed;
+    --purple-light: #f3e8ff;
+    --purple-dark: #6d28d9;
+}
+
+body {
+    direction: rtl;
+    font-family: 'Tajawal', sans-serif;
+    background: linear-gradient(135deg, #f3e8ff 0%, #faf5ff 100%);
+    color: #1e293b;
+}
+
+.vr-setup-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1.25rem;
+}
+
+.vr-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 0.5rem 0;
+}
+
+.vr-header a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--purple);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.vr-header a:hover {
+    color: var(--purple-dark);
+    transform: translateX(5px);
+}
+
+.vr-header h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    margin: 0;
+    color: var(--purple-dark);
+}
+
+.vr-card {
+    background: #fff;
+    border-radius: 1.5rem;
+    box-shadow: 0 24px 72px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    border: 2px solid var(--purple-light);
+}
+
+.vr-card-header {
+    background: linear-gradient(135deg, var(--purple) 0%, #c084fc 100%);
+    color: #fff;
+    padding: 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.vr-card-header i {
+    font-size: 1.85rem;
+}
+
+.vr-card-header h2 {
+    font-size: 1.45rem;
+    margin: 0;
+    font-weight: 800;
+}
+
+.vr-card-body {
+    padding: 2rem;
+}
+
+.form-section {
+    margin-bottom: 2.5rem;
+}
+
+.form-section h3 {
+    font-size: 1.1rem;
+    color: var(--purple-dark);
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--purple-light);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #334155;
+    font-size: 0.95rem;
+}
+
+.form-control,
+.form-select {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    outline: none;
+}
+
+.form-group help-text {
+    display: block;
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 0.5rem;
+}
+
+.design-platform-section {
+    background: linear-gradient(135deg, var(--purple-light) 0%, #ede9fe 100%);
+    border: 2px dashed var(--purple);
+    border-radius: 1rem;
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.design-platform-section p {
+    font-size: 1rem;
+    color: #475569;
+    margin-bottom: 1.25rem;
+    line-height: 1.6;
+}
+
+.design-platform-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--purple);
+    color: #fff;
+    padding: 1rem 1.75rem;
+    border: none;
+    border-radius: 0.85rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    font-family: 'Tajawal', sans-serif;
+}
+
+.design-platform-btn:hover {
+    background: var(--purple-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+}
+
+.design-platform-btn i {
+    font-size: 1.25rem;
+}
+
+.url-info-box {
+    background: #f0f9ff;
+    border-left: 4px solid #0ea5e9;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #334155;
+    line-height: 1.6;
+}
+
+.url-info-box i {
+    color: #0ea5e9;
+    margin-left: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn-submit,
+.btn-cancel {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 0.85rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Tajawal', sans-serif;
+}
+
+.btn-submit {
+    background: var(--purple);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-submit:hover {
+    background: var(--purple-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+}
+
+.btn-cancel {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.btn-cancel:hover {
+    background: #cbd5e1;
+}
+
+.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.errorlist li {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    border-right: 4px solid #dc2626;
+}
+
+.non-field-errors {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    color: #991b1b;
+}
+
+.loading {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading.active {
+    display: block;
+}
+
+.spinner {
+    border: 4px solid var(--purple-light);
+    border-top: 4px solid var(--purple);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.steps-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.steps-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: -1;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    background: #e2e8f0;
+    border: 2px solid #e2e8f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.step.active .step-number {
+    background: var(--purple);
+    border-color: var(--purple);
+    color: #fff;
+    box-shadow: 0 0 0 8px rgba(124, 58, 237, 0.1);
+}
+
+.step.completed .step-number {
+    background: #10b981;
+    border-color: #10b981;
+    color: #fff;
+}
+
+.step-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+}
+
+.step.active .step-label {
+    color: var(--purple);
+}
+
+@media (max-width: 768px) {
+    .vr-setup-container {
+        margin: 1rem auto;
+        padding: 0 1rem;
+    }
+
+    .vr-header h1 {
+        font-size: 1.45rem;
+    }
+
+    .vr-card-body {
+        padding: 1.5rem;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        justify-content: stretch;
+    }
+
+    .btn-submit,
+    .btn-cancel {
+        width: 100%;
+    }
+
+    .design-platform-section {
+        padding: 1.25rem;
+    }
+
+    .design-platform-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .steps-indicator {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .steps-indicator::before {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vr-setup-container">
+    <!-- Header -->
+    <div class="vr-header">
+        <a href="{% url 'learning:teacher_dashboard' %}">
+            <i class="fas fa-chevron-right"></i>
+            العودة للوحة التحكم
+        </a>
+        <h1><i class="fas fa-vr-cardboard"></i> إعداد الواقع الافتراضي</h1>
+    </div>
+
+    <!-- Steps Indicator -->
+    <div class="steps-indicator">
+        <div class="step {% if not is_edit %}active{% else %}completed{% endif %}">
+            <div class="step-number">1</div>
+            <div class="step-label">اختيار الدرس</div>
+        </div>
+        <div class="step {% if is_edit %}active{% else %}{% if request.POST %}completed{% endif %}{% endif %}">
+            <div class="step-number">2</div>
+            <div class="step-label">تصميم البيئة</div>
+        </div>
+        <div class="step {% if is_edit %}active{% endif %}">
+            <div class="step-number">3</div>
+            <div class="step-label">إدراج الرابط</div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="vr-card">
+        <div class="vr-card-header">
+            <i class="fas fa-cube"></i>
+            <h2>إعدادات تجربة الواقع الافتراضي التعليمية</h2>
+        </div>
+
+        <div class="vr-card-body">
+            {% if form.non_field_errors %}
+            <div class="non-field-errors">
+                {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" id="vrForm">
+                {% csrf_token %}
+
+                <!-- Section 1: اختيار الدرس -->
+                <div class="form-section">
+                    <h3><i class="fas fa-book"></i> الخطوة الأولى: اختر الدرس</h3>
+
+                    <div class="form-group">
+                        <label for="{{ form.classroom.id_for_label }}">
+                            <i class="fas fa-school"></i> {{ form.classroom.label }}
+                        </label>
+                        {{ form.classroom }}
+                        {% if form.classroom.errors %}
+                            <div class="errorlist">
+                                {% for error in form.classroom.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.subject.id_for_label }}">
+                            <i class="fas fa-graduation-cap"></i> {{ form.subject.label }}
+                        </label>
+                        {{ form.subject }}
+                        {% if form.subject.errors %}
+                            <div class="errorlist">
+                                {% for error in form.subject.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="url-info-box">
+                            <i class="fas fa-info-circle"></i>
+                            اختر المادة الدراسية أولاً ليتم تحديث قائمة الدروس تلقائياً
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.lesson.id_for_label }}">
+                            <i class="fas fa-video"></i> {{ form.lesson.label }}
+                        </label>
+                        {{ form.lesson }}
+                        {% if form.lesson.errors %}
+                            <div class="errorlist">
+                                {% for error in form.lesson.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Section 2: Design Platform -->
+                <div class="form-section">
+                    <h3><i class="fas fa-tools"></i> الخطوة الثانية: صمّم بيئة الواقع الافتراضي</h3>
+
+                    <div class="design-platform-section">
+                        <p>
+                            <i class="fas fa-external-link-alt" style="font-size: 1.5rem; margin-bottom: 1rem; display: block;"></i>
+                            انقل إلى منصة تصميم بيئة الواقع الافتراضي التعليمية
+                        </p>
+                        <a href="{{ design_platform_url }}" target="_blank" class="design-platform-btn">
+                            <i class="fas fa-rocket"></i>
+                            افتح منصة التصميم
+                        </a>
+                        <div class="url-info-box">
+                            <i class="fas fa-lightbulb"></i>
+                            اذهب إلى منصة Google AI Studio لتصميم بيئة واقع افتراضي تفاعلية. بعد الانتهاء من التصميم، انسخ رابط الموقع المصمم والصقه في الحقل أدناه.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: إدراج الرابط -->
+                <div class="form-section">
+                    <h3><i class="fas fa-link"></i> الخطوة الثالثة: أدرج رابط الموقع</h3>
+
+                    <div class="form-group">
+                        <label for="{{ form.vr_url.id_for_label }}">
+                            <i class="fas fa-globe"></i> {{ form.vr_url.label }}
+                        </label>
+                        {{ form.vr_url }}
+                        {% if form.vr_url.errors %}
+                            <div class="errorlist">
+                                {% for error in form.vr_url.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="url-info-box">
+                            <i class="fas fa-paste"></i>
+                            الصق رابط الموقع المصمم هنا. هذا الرابط سيُرسل للطالب بشكل آمن ولن يراه في الواجهة، لكن سيستخدم عند النقر على زر "استكشاف VR".
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <a href="{% url 'learning:teacher_dashboard' %}" class="btn-cancel">
+                        <i class="fas fa-times"></i>
+                        إلغاء
+                    </a>
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-save"></i>
+                        {% if is_edit %}تحديث{% else %}حفظ{% endif %} تجربة الواقع الافتراضي
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const classroomSelect = document.getElementById('id_classroom');
+    const subjectSelect = document.getElementById('id_subject');
+    const lessonSelect = document.getElementById('id_lesson');
+
+    // حدّث المواد عند تغيير الصف
+    classroomSelect.addEventListener('change', function() {
+        const classroomId = this.value;
+        console.log('Classroom changed to:', classroomId);
+        
+        if (!classroomId) {
+            subjectSelect.innerHTML = '<option value="">-- اختر المادة الدراسية --</option>';
+            lessonSelect.innerHTML = '<option value="">-- اختر الدرس --</option>';
+            return;
+        }
+
+        fetch('{% url "learning:vr_get_subjects" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'classroom_id=' + encodeURIComponent(classroomId)
+        })
+        .then(response => {
+            console.log('Subjects response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Subjects data received:', data);
+            if (data.success && data.subjects) {
+                subjectSelect.innerHTML = '<option value="">-- اختر المادة الدراسية --</option>';
+                data.subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.id;
+                    option.textContent = subject.subjectname;
+                    console.log('Adding subject:', subject.id, subject.subjectname);
+                    subjectSelect.appendChild(option);
+                });
+            } else {
+                console.error('API returned error:', data.error);
+                alert('خطأ: ' + (data.error || 'فشل جلب المواد'));
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching subjects:', error);
+            alert('خطأ في الاتصال: ' + error);
+        });
+    });
+
+    // حدّث الدروس عند تغيير المادة
+    subjectSelect.addEventListener('change', function() {
+        const subjectId = this.value;
+        console.log('Subject changed to:', subjectId);
+        
+        if (!subjectId) {
+            lessonSelect.innerHTML = '<option value="">-- اختر الدرس --</option>';
+            return;
+        }
+
+        fetch('{% url "learning:vr_get_lessons" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'subject_id=' + encodeURIComponent(subjectId)
+        })
+        .then(response => {
+            console.log('Lessons response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Lessons data received:', data);
+            if (data.success && data.lessons) {
+                lessonSelect.innerHTML = '<option value="">-- اختر الدرس --</option>';
+                data.lessons.forEach(lesson => {
+                    const option = document.createElement('option');
+                    option.value = lesson.id;
+                    option.textContent = lesson.lessontitle;
+                    console.log('Adding lesson:', lesson.id, lesson.lessontitle);
+                    lessonSelect.appendChild(option);
+                });
+            } else {
+                console.error('API returned error:', data.error);
+                alert('خطأ: ' + (data.error || 'فشل جلب الدروس'));
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching lessons:', error);
+            alert('خطأ في الاتصال: ' + error);
+        });
+    });
+
+    // معالجة إرسال النموذج
+    document.getElementById('vrForm').addEventListener('submit', function(e) {
+        const submitBtn = this.querySelector('.btn-submit');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+    });
+});
+</script>
+{% endblock %}

@@ -824,8 +824,8 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
         </a>
       </div>
 
-      <!-- VR Environment Card (Disabled) -->
-      <div class="advanced-tool-card disabled">
+      <!-- VR Environment Card -->
+      <div class="advanced-tool-card">
         <div class="atc-icon">
           <i class="fas fa-vr-cardboard"></i>
         </div>
@@ -833,14 +833,10 @@ body { background: var(--bg); font-family: 'Cairo', 'Tajawal', sans-serif; color
         <div class="atc-desc">
           أنشئ تجربة واقع افتراضي مرتبطة بمحتوى الدرس لرفع مستوى التفاعل والفهم.
         </div>
-        <span class="atc-badge">
-          <i class="fas fa-clock"></i>
-          قريباً
-        </span>
-        <button class="atc-cta" disabled>
-          <i class="fas fa-lock"></i>
-          غير متاح
-        </button>
+        <a href="{% url 'learning:vr_lesson_setup' %}" class="atc-cta">
+          <i class="fas fa-cube"></i>
+          ابدأ
+        </a>
       </div>
     </div>
   </div>

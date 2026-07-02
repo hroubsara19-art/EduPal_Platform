@@ -863,6 +863,16 @@ def view_lesson_student(request, lesson_id):
             'checkpoint_type': cp.checkpoint_type,
             'correct_answer': cp.correct_answer,
         })
+    
+    # التحقق من وجود تجربة واقع افتراضي للدرس
+    vr_lesson = None
+    vr_url = None
+    from learning.models import VRLesson
+    try:
+        vr_lesson = VRLesson.objects.get(lesson=lesson, is_published=True)
+        vr_url = vr_lesson.vr_url
+    except VRLesson.DoesNotExist:
+        pass
 
     return render(request, 'student_app/view_lesson_student.html', {
         'lesson':         lesson,
@@ -878,7 +888,8 @@ def view_lesson_student(request, lesson_id):
         'has_manual_video': has_manual_video,
         'has_ai_video':   has_ai_video,
         'visual_urls':    visual_urls,
-        'has_vr':         bool(visual_urls),
+        'has_vr':         bool(vr_lesson),
+        'vr_url':         vr_url,
         'checkpoints':    checkpoint_data,
     })
 
@@ -997,20 +1008,15 @@ def lesson_vr_experience(request, lesson_id):
                 messages.error(request, 'هذا الدرس غير متاح لصفك.')
                 return redirect('student:student_home')
 
-    visuals = lesson.ai_visualpath if isinstance(lesson.ai_visualpath, list) else []
-    visual_urls = [
-        _build_image_url(str(path).strip())
-        for path in visuals if path and str(path).strip()
-    ]
-    visual_urls = [url for url in visual_urls if url]
-    if not visual_urls:
+    # البحث عن تجربة الواقع الافتراضي
+    from learning.models import VRLesson
+    try:
+        vr_lesson = VRLesson.objects.get(lesson=lesson, is_published=True)
+        # إعادة التوجيه إلى رابط VR المصمم من قبل المعلم
+        return redirect(vr_lesson.vr_url)
+    except VRLesson.DoesNotExist:
         messages.error(request, 'تجربة الواقع الافتراضي غير متوفرة لهذا الدرس.')
         return redirect('student:view_lesson_student', lesson_id=lesson_id)
-
-    return render(request, 'student_app/lesson_vr_experience.html', {
-        'lesson':      lesson,
-        'visual_urls': visual_urls,
-    })
 
 
 @login_required

@@ -884,3 +884,75 @@ class LearningStateSnapshot(models.Model):
     
     def __str__(self):
         return f"Snapshot for Session {self.sessionid_id} at {self.snapshot_time}"
+# â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+# VRLesson
+# â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+class VRLesson(models.Model):
+    """
+    ظ†ظ…ظˆط°ط¬ طھط®ط²ظٹظ† طھط¬ط§ط±ط¨ ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…ط±طھط¨ط·ط© ط¨ط§ظ„ط¯ط±ظˆط³
+    - ظٹط±ط¨ط· ظƒظ„ ط¯ط±ط³ ط¨طھط¬ط±ط¨ط© ظˆط§ظ‚ط¹ ط§ظپطھط±ط§ط¶ظٹ ظپط±ظٹط¯ط©
+    - ظٹط­طھظپط¸ ط¨ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„طھطµظ…ظٹظ… ظˆط§ظ„ط±ط§ط¨ط· ط§ظ„ظ†ظ‡ط§ط¦ظٹ ظ„ظ„ط·ط§ظ„ط¨
+    """
+    vr_id = models.AutoField(db_column='VR_ID', primary_key=True)
+    lesson = models.OneToOneField(
+        'Lessoncontent',
+        on_delete=models.CASCADE,
+        db_column='LessonID',
+        related_name='vr_experience'
+    )
+    teacher = models.ForeignKey(
+        'Teacher',
+        on_delete=models.CASCADE,
+        db_column='TeacherID'
+    )
+    subject = models.ForeignKey(
+        'Subject',
+        on_delete=models.SET_NULL,
+        db_column='SubjectID',
+        null=True,
+        blank=True
+    )
+    classroom = models.ForeignKey(
+        'Class',
+        on_delete=models.SET_NULL,
+        db_column='ClassID',
+        null=True,
+        blank=True
+    )
+    vr_url = models.URLField(
+        db_column='VR_URL',
+        max_length=1000,
+        help_text='ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…طµظ…ظ… ظ…ظ† ظ‚ط¨ظ„ ط§ظ„ظ…ط¹ظ„ظ…'
+    )
+    design_platform_url = models.URLField(
+        db_column='DesignPlatformURL',
+        default='https://aistudio.google.com/apps/84df996b-346c-484f-a8e5-23b34c70a90d?showAssistant=true&project=gen-lang-client-0321460325&showPreview=true',
+        max_length=1000,
+        help_text='ط±ط§ط¨ط· ظ…ظ†طµط© طھطµظ…ظٹظ… ط¨ظٹط¦ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ'
+    )
+    is_published = models.BooleanField(
+        db_column='IsPublished',
+        default=False,
+        help_text='ظ‡ظ„ طھظ… ظ†ط´ط± طھط¬ط±ط¨ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ظ„ظ„ط·ط§ظ„ط¨طں'
+    )
+    created_at = models.DateTimeField(
+        db_column='CreatedAt',
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        db_column='UpdatedAt',
+        auto_now=True
+    )
+    
+    class Meta:
+        managed = True
+        db_table = 'VRLesson'
+        indexes = [
+            models.Index(fields=['teacher'], name='idx_vr_teacher'),
+            models.Index(fields=['classroom'], name='idx_vr_classroom'),
+            models.Index(fields=['is_published'], name='idx_vr_published'),
+            models.Index(fields=['lesson'], name='idx_vr_lesson'),
+        ]
+    
+    def __str__(self):
+        return f"VR: {self.lesson.lessontitle} - {self.teacher.userid.fullname}"

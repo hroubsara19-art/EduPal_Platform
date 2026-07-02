@@ -72,6 +72,13 @@ urlpatterns = [
     path('api/cognitive_signal/', learning_views.api_cognitive_signal, name='api_cognitive_signal'),
     path('api/behavioral_baseline/', learning_views.api_behavioral_baseline, name='api_behavioral_baseline'),
     path('api/send_level3_notification/', learning_views.api_send_level3_notification, name='api_send_level3_notification'),
+
+    # ── تجارب الواقع الافتراضي ────────────────────────────────
+    path('teacher/vr-setup/', learning_views.vr_lesson_setup, name='vr_lesson_setup'),
+    path('teacher/vr-edit/<int:vr_id>/', learning_views.vr_lesson_edit, name='vr_lesson_edit'),
+    path('teacher/vr-delete/<int:vr_id>/', learning_views.vr_lesson_delete, name='vr_lesson_delete'),
+    path('teacher/vr/api/subjects/', learning_views.get_subjects_for_class, name='vr_get_subjects'),
+    path('teacher/vr/api/lessons/', learning_views.get_lessons_for_subject, name='vr_get_lessons'),
 ]
 
 if settings.DEBUG:
