@@ -742,20 +742,16 @@ var AudioManager = (function(){
                 }
                 _state.lessonAudioPlaying = true;
                 _sessionState.audioPausedByUser = false;
-                _sessionState.audioPausedBySystem = false;
                 resumeWordHighlight();
             });
             audio.addEventListener('pause', function(){
                 _state.lessonAudioPlaying = false;
-                if (!_sessionState.audioPausedBySystem) {
-                    _sessionState.audioPausedByUser = true;
-                }
+                _sessionState.audioPausedByUser = true;
                 pauseWordHighlight();
             });
             audio.addEventListener('ended', function(){
                 _state.lessonAudioPlaying = false;
                 _sessionState.audioPausedByUser = false;
-                _sessionState.audioPausedBySystem = false;
             });
         }
         },
@@ -891,6 +887,23 @@ document.addEventListener('keydown', function(e){
     }
 });
 
+// Page Visibility API - إيقاف الصوت والتتبع عند خروج الطالب من الصفحة
+document.addEventListener('visibilitychange', function(){
+    if (document.hidden) {
+        console.log('[Visibility] Page hidden - stopping audio and tracking (distraction time preserved)');
+        var audio = document.getElementById('topAudio');
+        if (audio && !audio.paused) {
+            audio.pause();
+            _sessionState.audioPausedByUser = true;
+        }
+        if (trackingActive) {
+            stopTracking();
+        }
+    } else {
+        console.log('[Visibility] Page visible - user must manually resume audio and tracking');
+    }
+});
+
 // مراقبة تشغيل/إيقاف الصوت من زر التسجيل في الشاشة
 document.addEventListener('DOMContentLoaded', function(){
     var audio = document.getElementById('topAudio');
@@ -907,19 +920,20 @@ document.addEventListener('DOMContentLoaded', function(){
             _sessionState.audioPausedByUser = false;
             _attentionState.pausedByUser = false;
             if (!trackingActive) {
+                console.log('[Audio] Audio playing - resuming tracking');
                 resumeTracking();
+            } else {
+                console.log('[Audio] Audio playing - tracking already active');
             }
         });
 
         audio.addEventListener('pause', function(){
-            // لا نوقف التتبع إذا كان الإيقاف بسبب التنبيه الصوتي
-            if (!_attentionState.audioPausedForAlert) {
-                _sessionState.audioPausedByUser = true;
-                _attentionState.pausedByUser = true;
-                // إيقاف التتبع فعلياً عند الإيقاف اليدوي
-                if (trackingActive) {
-                    stopTracking();
-                }
+            // إيقاف التتبع دائماً عند إيقاف الصوت (سواء يدوياً أو بسبب التنبيهات)
+            _sessionState.audioPausedByUser = true;
+            _attentionState.pausedByUser = true;
+            if (trackingActive) {
+                console.log('[Audio] Audio paused - stopping tracking');
+                stopTracking();
             }
         });
     }
@@ -1096,17 +1110,8 @@ function updateProbabilisticModel(attentive, score, now, distractionLevel) {
         // ✅ تراكم وقت الانتباه المستمر (لطلاب ADHD)
         _probabilisticModel.continuousAttentionTime += timeSinceLastUpdate;
 
-        // ✅ تصفير وقت التشتت وعدادات المستويات بعد انتباه مستمر لمدة أكثر من 3 ثواني
-        // الانتباه لمدة 3 ثواني وأقل لا يحسب تركيزاً
-        if (_probabilisticModel.continuousAttentionTime > _probabilisticModel.sustainedAttentionThreshold) {
-            _probabilisticModel.totalDistractionTime = 0;
-            _probabilisticModel.continuousAttentionTime = 0;
-            // ✅ تصفير عدادات المستويات عند التعافي
-            _sessionState.lastLevel1TriggerTime = 0;
-            _sessionState.lastLevel2TriggerTime = 0;
-            console.log('[Probabilistic] Sustained attention detected (>3s). Distraction time and level counters reset to 0');
-        }
-
+        // ✅ لا نقوم بتصفير وقت التشتت - نحفظه للاستئناف عند عودة التتبع
+        // الانتباه المستمر يساعد فقط في تقليل الاحتمال تدريجياً
         console.log('[Probabilistic] Attention detected. Probability:', _probabilisticModel.currentProbability.toFixed(3), 'Continuous distraction time:', _probabilisticModel.totalDistractionTime.toFixed(2) + 's', 'Continuous attention time:', _probabilisticModel.continuousAttentionTime.toFixed(2) + 's');
     }
 }
@@ -1484,7 +1489,6 @@ function feedbackForDistractionLevel(level, s, duration) {
 function pauseLessonAudio() {
     var audio = document.getElementById('topAudio');
     if (audio && !audio.paused) {
-        _sessionState.audioPausedBySystem = true;
         audio.pause();
     }
     pauseWordHighlight();

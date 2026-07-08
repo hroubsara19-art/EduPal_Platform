@@ -36,9 +36,21 @@ body{direction:rtl;font-family:'Tajawal',sans-serif;background:#f3f6fb;color:#1e
       <h1><i class="fas fa-vr-cardboard"></i> تجربة الواقع الافتراضي: {{ lesson.lessontitle }}</h1>
     </header>
     <div class="vr-body">
-      <p class="vr-intro">
-        استعن بولي أمرك أو شخصا كبيرا من أسرتك لمساعدتك في تشغيل بيئة الواقع الافتراضي للدرس
-      </p>
+      <div class="vr-intro">
+        <h4 style="color:#7c3aed;margin-bottom:1rem;font-weight:700;">خطوات تجربة الواقع الافتراضي:</h4>
+        <ol style="padding-right:1.5rem;line-height:2;color:#334155;">
+          <li><strong>اطلب المساعدة:</strong> استعن بولي أمرك أو شخص كبير من أسرتك لمساعدتك في تشغيل بيئة الواقع الافتراضي.</li>
+          <li><strong>حمّل المرفق:</strong> انقر على زر <span style="color:#0ea5e9;">"تحميل المرفق"</span> لتحميل محتوى الدرس المصمم للتجربة ثلاثية الأبعاد.</li>
+          <li><strong>انتقل إلى منصة VR:</strong> انقر على زر <span style="color:#7c3aed;">"استكشاف VR"</span> للانتقال إلى خدمة تصميم بيئة الواقع الافتراضي.</li>
+          <li><strong>استورد الدرس:</strong> في الموقع الخارجي، ستجد زرين أصفرين:
+            <ul style="padding-right:1.5rem;margin-top:.5rem;">
+              <li>اختر <span style="color:#f59e0b;">"استيراد درس"</span> من مكتبة الدروس المحفوظة</li>
+              <li>حدد المرفق الذي حمّلته سابقاً</li>
+            </ul>
+          </li>
+          <li><strong>ابدأ التجربة:</strong> انقر على زر <span style="color:#f59e0b;">"تجربة الطالب"</span> لاستكشاف الدرس في بيئة ثلاثية الأبعاد على الحاسوب أو الهاتف، مع إمكانية استخدام نظارات VR البسيطة والرخيصة.</li>
+        </ol>
+      </div>
 
       <div class="vr-actions">
         <a href="{{ vr_lesson.vr_url }}" target="_blank" class="vr-btn" data-lesson-id="{{ lesson.pk }}" data-action="explore">

@@ -282,18 +282,44 @@
     var panel = document.getElementById('chat-panel');
     var fab = document.getElementById('chat-fab');
     if(!panel) return;
-    
+
     panel.classList.toggle('open', chatOpen);
     fab.innerHTML = chatOpen ? '<i class="fas fa-times"></i>' : '<i class="fas fa-robot"></i>';
-    
+
     if (chatOpen) {
+      // إيقاف الصوت/الفيديو عند فتح المساعد الذكي
+      var audio = document.getElementById('topAudio');
+      if (audio && !audio.paused) {
+        audio.pause();
+        window.audioPausedForAIAssistant = true;
+      }
+      var video = document.querySelector('video.video-player');
+      if (video && !video.paused) {
+        video.pause();
+        window.videoPausedForAIAssistant = true;
+      }
+
       setTimeout(() => {
         var inp = document.getElementById('chat-input');
         if(inp) inp.focus();
       }, 300);
       scrollChat();
-    } else if (isRecognizing) {
-      recognition.stop();
+    } else {
+      // إعادة تشغيل الصوت/الفيديو عند إغلاق المساعد الذكي
+      var audio = document.getElementById('topAudio');
+      if (audio && window.audioPausedForAIAssistant) {
+        audio.play().catch(function(e){ console.log('[Chat] Autoplay blocked:', e); });
+        window.audioPausedForAIAssistant = false;
+      }
+      var video = document.querySelector('video.video-player');
+      if (video && window.videoPausedForAIAssistant) {
+        video.play().catch(function(e){ console.log('[Chat] Autoplay blocked:', e); });
+        window.videoPausedForAIAssistant = false;
+      }
+
+      if (isRecognizing) {
+        recognition.stop();
+      }
     }
   };
 

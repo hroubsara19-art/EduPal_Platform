@@ -506,19 +506,13 @@ function selectCheckpointAnswer(answer) {
   var isCorrect = (answer === currentCheckpoint.correct_answer);
   console.log('[Checkpoint] Answer is correct:', isCorrect);
 
-  // ✅ تصفير وقت التشتت عند الإجابة الصحيحة على السؤال التكيفي
-  // الاعتماد على الانتباه المستمر (2.5 ثانية) لتصفير وقت التشتت أيضاً
+  // ✅ لا نقوم بتصفير وقت التشتت عند الإجابة الصحيحة - نحفظه للاستئناف
+  // الإجابة الصحيحة تقلل الاحتمال تدريجياً فقط
   if (isCorrect) {
-    _probabilisticModel.totalDistractionTime = 0;
-    _probabilisticModel.continuousAttentionTime = 0;
-    // ✅ تصفير عدادات المستويات عند الإجابة الصحيحة
-    lastLevel1DistractionTime = 0;
-    lastLevel2DistractionTime = 0;
-    console.log('[Checkpoint] Correct answer - distraction time and level counters reset to 0');
+    // ✅ تحديث الإشارة المعرفية (الأداء التفاعلي - 60%)
+    updateCognitiveSignal(isCorrect, Date.now());
+    console.log('[Checkpoint] Correct answer - cognitive signal updated, distraction time preserved');
   }
-
-  // ✅ تحديث الإشارة المعرفية (الأداء التفاعلي - 60%)
-  updateCognitiveSignal(isCorrect, Date.now());
 
   // ✅ حساب النوافذ الزمنية للمستويات الثلاثة بناءً على مدة الفيديو
   var videoDuration = videoElement && isFinite(videoElement.duration) && videoElement.duration > 0 ? videoElement.duration : 600;
@@ -895,7 +889,6 @@ var _probabilisticModel = {
 
 // Video state tracking
 var _videoState = {
-  pausedBySystem: false,
   pausedByUser: false,
   wasPlayingBeforeDistraction: false
 };
@@ -1403,12 +1396,29 @@ function onVideoPlay() {
 
   // Start tracking only when video plays
   if (!trackingActive) {
-    startTracking();
+    console.log('[Video] Starting tracking as video is playing');
+    // Ensure camera is available before starting tracking
+    if (!_mediaStream) {
+      console.log('[Video] Camera stream not available, requesting camera permission');
+      requestCameraAndStart();
+    } else {
+      startTracking();
+    }
   } else {
     // If session exists and WS is open, resume sending frames
     if (ws && ws.readyState === WebSocket.OPEN) {
       startFrameSending();
       updateStatus('attentive', 'التتبع مستأنف');
+    } else {
+      // If WS is closed, restart tracking
+      console.log('[Video] WS closed, restarting tracking');
+      // Ensure camera is still available
+      if (!_mediaStream) {
+        console.log('[Video] Camera stream not available, requesting camera permission');
+        requestCameraAndStart();
+      } else {
+        startTracking();
+      }
     }
   }
 }
@@ -1419,17 +1429,11 @@ function onVideoPause() {
   // Stop checkpoint checking
   stopCheckpointChecking();
 
-  // If paused by system (distraction), don't stop tracking
-  if (_videoState.pausedBySystem) {
-    console.log('[Video] ℹ Paused by system (distraction) - tracking continues');
-    return;
-  }
-
-  // User manually paused the video
-  console.log('[Video] ❚❚ User paused video manually - pausing frame sending (session remains)');
+  // Stop tracking always when video is paused (manually or by system)
+  console.log('[Video] ❚❚ Video paused - stopping tracking');
   _videoState.pausedByUser = true;
   _videoState.wasPlayingBeforeDistraction = false;
-  pauseTracking();
+  stopTracking();
 }
 
 function onVideoEnded() {
@@ -1517,11 +1521,11 @@ function stopTracking() {
     console.log('[Attention] WebSocket closed');
   }
 
-  // Stop camera stream
+  // Stop camera stream - this will require re-requesting on resume
   if (_mediaStream) {
     _mediaStream.getTracks().forEach(function(t) { t.stop(); });
     _mediaStream = null;
-    console.log('[Attention] Camera stream stopped');
+    console.log('[Attention] Camera stream stopped (will be re-requested on video play)');
   }
 
   // Stop all audio alerts
@@ -1775,7 +1779,6 @@ function processAttentionState(s) {
     // إيقاف الفيديو مؤقتاً
     if (videoElement) {
       videoElement.pause();
-      _videoState.pausedBySystem = true;
     }
   }
 
@@ -1808,7 +1811,8 @@ function processAttentionState(s) {
     if (!_alertState.distractionTimerPaused) {
         _probabilisticModel.totalDistractionTime += timeSinceLastUpdate;
     }
-    _probabilisticModel.continuousAttentionTime = 0;
+    // ✅ لا نقوم بتصفير continuousAttentionTime - نحفظه للاستئناف
+    // الانتباه المستمر يساعد فقط في تقليل الاحتمال تدريجياً
 
     // Calculate duration of current distraction
     var duration = (now - (_attentionState.startTime || now)) / 1000;
@@ -1936,7 +1940,6 @@ function showLongAlert() {
   console.log('[Attention] 🔴 Long alert triggered (7 seconds)');
 
   if (videoElement && !videoElement.paused) {
-    _videoState.pausedBySystem = true;
     videoElement.pause();
     console.log('[Attention] Video paused due to 7+ second distraction');
   }
@@ -1966,7 +1969,6 @@ function showSevereAlert() {
   console.log('[Attention] 🔥 Severe alert triggered (10 seconds)');
 
   if (videoElement && !videoElement.paused) {
-    _videoState.pausedBySystem = true;
     videoElement.pause();
     console.log('[Attention] Video paused due to 10+ second distraction');
   }
@@ -2011,16 +2013,8 @@ function onAttentiveDetected() {
     console.log('[Attention] Checkpoint timer cancelled due to focus return');
   }
 
-  // Auto-resume video if paused by system
-  if (videoElement && videoElement.paused && _videoState.pausedBySystem) {
-    console.log('[Attention] Resuming video after focus returned');
-    _videoState.pausedBySystem = false;
-    _videoState.wasPlayingBeforeDistraction = true;
-
-    videoElement.play().catch(function(e) {
-      console.error('[Attention] Error resuming video:', e);
-    });
-  }
+  // Note: Video auto-resume removed - tracking stops when video is paused for any reason
+  // User must manually resume video to restart tracking
 
   // Reset distraction tracking
   resetAttentionState();
@@ -2211,7 +2205,6 @@ function showDrowsyModalVideo(studentName) {
     // إعادة تشغيل الفيديو
     if (videoElement) {
       videoElement.play();
-      _videoState.pausedBySystem = false;
     }
   });
 }
@@ -2253,6 +2246,22 @@ document.addEventListener('DOMContentLoaded', function() {
 // Cleanup on page unload
 window.addEventListener('beforeunload', function() {
   stopTracking();
+});
+
+// Page Visibility API - إيقاف الفيديو والتتبع عند خروج الطالب من الصفحة
+document.addEventListener('visibilitychange', function(){
+    if (document.hidden) {
+        console.log('[Visibility] Page hidden - stopping video and tracking (distraction time preserved)');
+        if (videoElement && !videoElement.paused) {
+            videoElement.pause();
+            _videoState.pausedByUser = true;
+        }
+        if (trackingActive) {
+            stopTracking();
+        }
+    } else {
+        console.log('[Visibility] Page visible - user must manually resume video and tracking');
+    }
 });
 </script>
 {% endblock %}
