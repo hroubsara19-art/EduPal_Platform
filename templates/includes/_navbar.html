@@ -1,10 +1,10 @@
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm" style="background: linear-gradient(135deg, #5a91e6 0%, #4a7bc7 100%);">
+<nav class="navbar navbar-expand-lg sticky-top shadow-sm" style="background: linear-gradient(135deg, #315b59 0%, #6c9c89 100%);">
     <div class="container">
         <a class="navbar-brand fw-bold d-flex align-items-center" href="{% url 'accounts:home' %}">
-            <div class="bg-white text-primary rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+            <div class="bg-white text-white rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: linear-gradient(135deg, #4f8583, #6c9c89);">
                 <i class="fas fa-book-reader"></i>
             </div>
-            <span style="letter-spacing: 1px;">EduPal <span class="fw-light">Platform</span></span>
+            <span style="letter-spacing: 1px; color: #fff;">منصة رفيق التعليمية</span>
         </a>
 
         <button class="navbar-toggler border-0" type="button"
@@ -38,7 +38,8 @@
                         </span>
                     </li>
                     <li class="nav-item">
-                        <a class="btn btn-light btn-sm rounded-pill px-4 fw-bold text-primary shadow-sm"
+                        <a class="btn btn-light btn-sm rounded-pill px-4 fw-bold shadow-sm"
+                           style="background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3);"
                            href="{% url 'accounts:logout' %}">
                             <i class="fas fa-sign-out-alt me-1"></i> خروج
                         </a>
@@ -48,7 +49,8 @@
                         <a class="nav-link text-white fw-bold" href="{% url 'accounts:login' %}">تسجيل الدخول</a>
                     </li>
                     <li class="nav-item ms-lg-2">
-                        <a class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm"
+                        <a class="btn rounded-pill px-4 fw-bold shadow-sm"
+                           style="background: #d8b36a; color: #fff;"
                            href="{% url 'accounts:signup' %}">ابدأ الآن مجاناً</a>
                     </li>
                 {% endif %}

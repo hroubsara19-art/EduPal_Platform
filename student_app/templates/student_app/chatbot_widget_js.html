@@ -20,6 +20,7 @@ var _lessonTitle = _cfg ? (_cfg.dataset.lessonTitle || 'الدرس') : 'الدر
 var chatOpen      = false;
 var chatLoading   = false;
 var chatRemaining = _chatLimit - _chatUsed;
+var currentAudio = null; // لتخزين كائن الصوت النشط
 
 /*
  * ✅ التعديل الجوهري:
@@ -30,7 +31,181 @@ var chatRemaining = _chatLimit - _chatUsed;
 var chatHistory = [];
 
 /* ══════════════════════════════════════════════════════
-   3. تهيئة عنوان الدرس وشارة الكوتا
+   3. نظام التعرف على الكلام (Speech Recognition)
+   ══════════════════════════════════════════════════════ */
+var recognition = null;
+var isRecognizing = false;
+
+function initSpeech() {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ar-SA';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = function() {
+        isRecognizing = true;
+        var btn = document.getElementById('chat-mic-btn');
+        if (btn) btn.classList.add('active');
+    };
+
+    recognition.onresult = function(event) {
+        var transcript = "";
+        for (var i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        var inp = document.getElementById('chat-input');
+        if (inp) {
+            inp.value = transcript;
+            window.autoResize(inp);
+        }
+    };
+
+    recognition.onerror = function(event) {
+        console.log('[Chat] Speech recognition error:', event.error);
+        stopSpeechUI();
+    };
+
+    recognition.onend = function() {
+        stopSpeechUI();
+    };
+}
+
+function startSpeech() {
+    if (!recognition) initSpeech();
+    if (!recognition) return;
+    try {
+        recognition.start();
+    } catch(e) {
+        console.log('[Chat] Speech already started');
+    }
+}
+
+function stopSpeechUI() {
+    isRecognizing = false;
+    var btn = document.getElementById('chat-mic-btn');
+    if (btn) btn.classList.remove('active');
+}
+
+/* ══════════════════════════════════════════════════════
+   4. نظام توليد الصوت (Text-to-Speech)
+   ══════════════════════════════════════════════════════ */
+async function playRafiqVoice(text) {
+    try {
+        // إيقاف أي صوت نشط
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+        }
+
+        const response = await fetch('/api/generate-voice/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        if (!response.ok) throw new Error('Voice generation failed');
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        
+        currentAudio = audio;
+
+        return new Promise((resolve, reject) => {
+            audio.addEventListener('ended', () => {
+                URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
+                resolve();
+            });
+            audio.addEventListener('error', (e) => {
+                URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
+                reject(e);
+            });
+            audio.play().catch(err => {
+                console.log(err);
+                currentAudio = null;
+                reject(err);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error playing voice:', error);
+        currentAudio = null;
+    }
+}
+
+function stopVoice() {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+    }
+}
+
+// تشغيل صوت رسالة معينة مع تظليل الكلمات
+window.playMessageVoice = function(btn) {
+    var msgDiv = btn.closest('.chat-msg');
+    var contentDiv = msgDiv.querySelector('.msg-content');
+    var text = contentDiv ? contentDiv.innerText : '';
+    
+    if (!text) return;
+    
+    // إذا كان الصوت يعمل، أوقفه
+    if (btn.classList.contains('playing')) {
+        stopVoice();
+        btn.classList.remove('playing');
+        // إعادة النص الأصلي
+        if (contentDiv) contentDiv.innerText = text;
+        return;
+    }
+    
+    // إيقاف أي صوت نشط
+    stopVoice();
+    
+    // تغيير حالة الزر
+    document.querySelectorAll('.voice-btn').forEach(function(b) {
+        b.classList.remove('playing');
+    });
+    btn.classList.add('playing');
+    
+    // تقسيم النص إلى كلمات للتظليل
+    var words = text.split(/\s+/);
+    contentDiv.innerHTML = words.map(function(word, index) {
+        return '<span class="word" data-index="' + index + '">' + word + '</span>';
+    }).join(' ');
+    
+    // تشغيل الصوت
+    playRafiqVoice(text).then(function() {
+        btn.classList.remove('playing');
+        // إعادة النص الأصلي
+        contentDiv.innerText = text;
+    }).catch(function() {
+        btn.classList.remove('playing');
+        contentDiv.innerText = text;
+    });
+    
+    // تظليل الكلمات بشكل متتابع (تقريبي)
+    var wordElements = contentDiv.querySelectorAll('.word');
+    var duration = 3000; // تقدير مدة الصوت بالمللي ثانية
+    var wordDelay = duration / words.length;
+    
+    wordElements.forEach(function(wordEl, index) {
+        setTimeout(function() {
+            wordElements.forEach(function(w) {
+                w.classList.remove('highlighted');
+            });
+            wordEl.classList.add('highlighted');
+        }, index * wordDelay);
+    });
+};
+
+/* ══════════════════════════════════════════════════════
+   5. تهيئة عنوان الدرس وشارة الكوتا
    ══════════════════════════════════════════════════════ */
 function initUI() {
     var titleEl = document.getElementById('chat-lesson-title');
@@ -49,7 +224,7 @@ function updateQuotaUI(rem) {
 }
 
 /* ══════════════════════════════════════════════════════
-   4. فتح وإغلاق النافذة
+   6. فتح وإغلاق النافذة
    ══════════════════════════════════════════════════════ */
 window.toggleChat = function() {
     chatOpen = !chatOpen;
@@ -58,8 +233,23 @@ window.toggleChat = function() {
     if (!panel) return;
 
     panel.classList.toggle('open', chatOpen);
+    
     if (chatOpen) {
-        fab.innerHTML = '<i class="fas fa-times"></i>';
+        // إخفاء الأيقونة عند فتح الشات
+        if (fab) fab.style.display = 'none';
+        
+        // إيقاف الصوت عند فتح المساعد الذكي
+        stopVoice();
+        
+        // إيقاف تتبع الانتباه إذا كان يعمل
+        if (typeof stopAttentionTracking === 'function') {
+            stopAttentionTracking();
+        }
+        
+        // إيقاف التسجيل الصوتي إذا كان يعمل
+        if (isRecognizing) {
+            recognition.stop();
+        }
 
         // إيقاف الصوت/الفيديو عند فتح المساعد الذكي
         var audio = document.getElementById('topAudio');
@@ -79,7 +269,8 @@ window.toggleChat = function() {
             scrollChat();
         }, 300);
     } else {
-        fab.innerHTML = '<i class="fas fa-robot"></i>';
+        // إظهار الأيقونة عند إغلاق الشات
+        if (fab) fab.style.display = 'flex';
 
         // إعادة تشغيل الصوت/الفيديو عند إغلاق المساعد الذكي
         var audio = document.getElementById('topAudio');
@@ -107,7 +298,7 @@ window.sendChat = function() {
 
     /* فحص الكوتا */
     if (chatRemaining <= 0) {
-        appendMsg('bot', '🌟 لقد استهلكت محاولاتك اليوم، نراك غداً بنشاط جديد!');
+        appendMsg('bot', 'لقد استهلكت محاولاتك اليوم، نراك غداً بنشاط جديد!');
         return;
     }
 
@@ -164,7 +355,7 @@ window.sendChat = function() {
         /* ✅ تحديد نوع الرسالة */
         if (data.ok) {
             /* رد ناجح */
-            appendMsg('bot', data.reply);
+            appendMsg('bot', data.reply, false, true);
         } else if (status === 429 || data.quota_exceeded) {
             /* تجاوز الحصة */
             appendMsg('bot', '🌟 ' + (data.error || 'وصلت للحد اليومي. عد غداً!'));
@@ -204,7 +395,7 @@ window.sendChat = function() {
         removeTyping(typingId);
         chatLoading = false;
         if (sendBtn) sendBtn.disabled = false;
-        appendMsg('bot', '📡 تعذّر الاتصال بالسيرفر — تحقق من الإنترنت وأعد المحاولة.', true);
+        appendMsg('bot', 'تعذّر الاتصال بالسيرفر — تحقق من الإنترنت وأعد المحاولة.', true);
         console.error('[Chat] fetch error:', err);
     });
 };
@@ -214,7 +405,7 @@ window.sendChat = function() {
    ══════════════════════════════════════════════════════ */
 
 /* إضافة رسالة — isError اختياري لتلوين الفقاعة بالأحمر */
-function appendMsg(type, text, isError) {
+function appendMsg(type, text, isError, isNewBotMsg) {
     var msgsEl = document.getElementById('chat-messages');
     if (!msgsEl) return;
 
@@ -223,15 +414,31 @@ function appendMsg(type, text, isError) {
     if (isError) cls += ' error-msg';
     div.className = cls;
 
-    /* تنسيق النص: escape +줄바꿈 + Bold */
-    var safe = (text || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\n/g, '<br>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    div.innerHTML = safe;
+    // إزالة الحروف الإنجليزية من النص
+    var cleanText = text.replace(/[a-zA-Z]/g, '').trim();
+    
+    // إضافة زر تشغيل الصوت لرسائل البوت
+    if (type === 'bot' && !isError) {
+        div.innerHTML = `
+            <div class="msg-content">${cleanText}</div>
+            <button class="voice-btn" onclick="playMessageVoice(this)" title="تشغيل الصوت">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        `;
+        
+        // تشغيل الصوت تلقائياً للرسائل الجديدة من البوت
+        if (isNewBotMsg && cleanText) {
+            setTimeout(function() {
+                var btn = div.querySelector('.voice-btn');
+                if (btn) {
+                    playMessageVoice(btn);
+                }
+            }, 500);
+        }
+    } else {
+        div.innerText = cleanText;
+    }
+    
     msgsEl.appendChild(div);
     scrollChat();
 }
@@ -271,6 +478,24 @@ window.handleChatKey = function(e) {
     }
 };
 
+window.toggleSpeech = function() {
+    if (!recognition) initSpeech();
+    if (!recognition) {
+        alert("متصفحك لا يدعم التعرف على الصوت.");
+        return;
+    }
+
+    if (isRecognizing) {
+        recognition.stop();
+    } else {
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Mic start error:", e);
+        }
+    }
+};
+
 window.autoResize = function(el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
@@ -279,7 +504,65 @@ window.autoResize = function(el) {
 /* ══════════════════════════════════════════════════════
    8. تهيئة عند تحميل الصفحة
    ══════════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', initUI);
+document.addEventListener('DOMContentLoaded', function() {
+    initUI();
+    initSpeech();
+});
+
+/* ══════════════════════════════════════════════════════
+   9. CSS إضافي للزر الصوت وتظليل الكلمات
+   ══════════════════════════════════════════════════════ */
+var style = document.createElement('style');
+style.textContent = `
+.chat-msg{
+  position:relative;
+}
+.msg-content{
+  margin-right:30px;
+}
+.voice-btn{
+  position:absolute;
+  top:5px;
+  left:5px;
+  width:24px;
+  height:24px;
+  border:none;
+  background:rgba(49,91,89,.1);
+  color:#315b59;
+  border-radius:50%;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.7rem;
+  transition:all .2s ease;
+}
+.voice-btn:hover{
+  background:rgba(49,91,89,.2);
+  transform:scale(1.1);
+}
+.voice-btn.playing{
+  background:#315b59;
+  color:#fff;
+  animation:pulse 1.5s infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.15);}
+}
+.word{
+  display:inline;
+  transition:background .2s ease,color .2s ease;
+  padding:0 2px;
+  border-radius:3px;
+}
+.word.highlighted{
+  background:rgba(49,91,89,.15);
+  color:#315b59;
+  font-weight:600;
+}
+`;
+document.head.appendChild(style);
 
 })();
 </script>

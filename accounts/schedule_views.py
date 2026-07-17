@@ -157,7 +157,7 @@ def schedule_page(request):
 # API: جلب مدخلات الأسبوع
 # ══════════════════════════════════════════════════════════════
 @login_required
-def schedule_get(request):
+def view(request):
     try:
         offset = int(request.GET.get('week', 0))
     except ValueError:
@@ -462,3 +462,51 @@ def _notify_students_schedule(entry, action='add'):
         pass
     if notifs:
         Notification.objects.bulk_create(notifs)
+@login_required
+def rafiq_today_schedule(request):
+    now   = datetime.now()
+    today = now.date()
+    print("RAFIQ DEBUG — user:", request.user.username, "| role:", getattr(request.user, 'userrole', None), "| now:", now, "| today:", today)
+    role = getattr(request.user, 'userrole', None)
+
+    if role == 'Student':
+        student = Student.objects.filter(userid=request.user).first()
+        if not student or not student.classid_id:
+            return JsonResponse({'entries': [], 'message': 'لسا ما في صف محدد إلك.'})
+        qs = ScheduleEntry.objects.filter(class_obj_id=student.classid_id)
+
+    elif role == 'Teacher':
+        teacher = Teacher.objects.filter(userid=request.user).first()
+        qs = ScheduleEntry.objects.filter(teacher=teacher)
+
+    elif role == 'Parent':
+        parent = Parent.objects.filter(userid=request.user).select_related('childid').first()
+        child  = parent.childid if parent else None
+        if not child or not child.classid_id:
+            return JsonResponse({'entries': [], 'message': ''})
+        qs = ScheduleEntry.objects.filter(class_obj_id=child.classid_id)
+
+    else:
+        return JsonResponse({'entries': [], 'message': ''})
+
+    entries = qs.select_related('subject').filter(
+        entry_date=today,
+        end_time__gt=now.time()
+    ).order_by('start_time')
+
+    data = [_serialize_entry(e) for e in entries]
+    message = _build_rafiq_message(data)
+    print("Entries:", data)
+    print("Message:", message)
+
+    return JsonResponse({'entries': data, 'message': message})
+def _build_rafiq_message(entries):
+    if not entries:
+        return "أَهْلًا يَا بَطَلُ! أَنْهَيْتَ كُلَّ مَوَاعِيدِكَ لِهَذَا اليَوْمِ."
+
+    parts = [f"{e['type_display']} {e['subject']} الساعة {e['start_time']}" for e in entries]
+
+    if len(parts) == 1:
+        return f" أَهْلًا يَا بَطَلُ! لَا تَنْسَ مَوَاعِيدَ اليَوْمِ لَدَيْكَ {parts[0]}"
+
+    return " أَهْلًا يَا بَطَلُ! لَا تَنْسَ مَوَاعِيدَ اليَوْمِ لَدَيْكَ " + "، وبعدها ".join(parts)

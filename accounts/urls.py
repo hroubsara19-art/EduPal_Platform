@@ -98,7 +98,7 @@ urlpatterns = [
 
     # ── جدول المهام ───────────────────────────────────────────
     path('schedule/',                       schedule_views.schedule_page,   name='schedule_page'),
-    path('schedule/get/',                   schedule_views.schedule_get,    name='schedule_get'),
+    path('schedule/get/',                   schedule_views.view,    name='schedule_get'),
     path('schedule/add/',                   schedule_views.schedule_add,    name='schedule_add'),
     path('schedule/edit/<int:entry_id>/',   schedule_views.schedule_edit,   name='schedule_edit'),
     path('schedule/delete/<int:entry_id>/', schedule_views.schedule_delete, name='schedule_delete'),
@@ -108,4 +108,5 @@ urlpatterns = [
     path('grades/api/attempts/',     grades_views.grades_api_attempts,  name='grades_api_attempts'),
     path('grades/api/override/',     grades_views.grades_api_override,  name='grades_api_override'),
     path('grades/api/approve/',      grades_views.grades_api_approve,   name='grades_api_approve'),
+    path('rafiq/today-schedule/', schedule_views.rafiq_today_schedule, name='rafiq_today_schedule'),
 ]

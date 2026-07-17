@@ -7,22 +7,28 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 :root{
-  --sky:#3b82f6;--sky-dk:#1d4ed8;--sky-lt:#eff6ff;--sky-bd:#bfdbfe;--sky-xlt:#f0f7ff;
-  --mint:#10b981;--mint-lt:#ecfdf5;--mint-bd:#6ee7b7;
-  --amber:#f59e0b;--amber-lt:#fffbeb;--amber-bd:#fde68a;
-  --rose:#ef4444;--rose-lt:#fef2f2;
-  --ink:#1e293b;--muted:#64748b;--border:#e2e8f0;--bg:#f0f5fb;--card:#fff;
-  --r:14px;--sh:0 2px 8px rgba(30,64,175,.07),0 6px 24px rgba(30,64,175,.05);
+  --sky:#4f8583;--sky-dk:#315b59;--sky-lt:#e5efe8;--sky-bd:#c8dbd1;--sky-xlt:#f7f4ec;
+  --mint:#6f9c90;--mint-lt:#e9f2ec;--mint-bd:#b8d2c3;
+  --amber:#d8b36a;--amber-lt:#fbf4e5;--amber-bd:#e8d09c;
+  --rose:#c9655b;--rose-lt:#faeeea;
+  --ink:#3d4038;--muted:#74766d;--border:#dfddd2;--bg:#f8f3e9;--card:#fffdf9;
+  --r:14px;--sh:0 2px 8px rgba(61,64,56,.06),0 6px 24px rgba(49,91,89,.08);
 }
 *,*::before,*::after{box-sizing:border-box;}
-body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',sans-serif;}
+body{
+  background:
+    radial-gradient(circle at 91% 5%,rgba(216,179,106,.13),transparent 25rem),
+    radial-gradient(circle at 5% 78%,rgba(79,133,131,.10),transparent 28rem),
+    linear-gradient(135deg,#fcf9f3 0%,#f7f2e9 52%,#edf3ed 100%);
+  color:var(--ink);direction:rtl;font-family:'Tajawal',sans-serif;
+}
 .sd-wrap{max-width:980px;margin:0 auto;padding:1.75rem 1.25rem 5rem;}
 
 /* ── Header ── */
 .sd-header{
   background:linear-gradient(135deg,var(--sky-dk),var(--sky));
   border-radius:1.25rem;padding:1.75rem 2rem;color:#fff;
-  margin-bottom:2rem;box-shadow:0 6px 24px rgba(29,78,216,.22);
+  margin-bottom:2rem;box-shadow:0 8px 26px rgba(49,91,89,.22);
   display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;
 }
 .sd-header-emoji{font-size:2.8rem;flex-shrink:0;}
@@ -71,11 +77,11 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 }
 .lesson-card:hover{
   transform:translateY(-4px);
-  box-shadow:0 8px 28px rgba(30,64,175,.12);
+  box-shadow:0 8px 28px rgba(49,91,89,.14);
   border-color:var(--sky-bd);text-decoration:none;color:inherit;
 }
 .lesson-card-thumb{
-  height:90px;background:linear-gradient(135deg,var(--sky-lt),#dbeafe);
+  height:90px;background:linear-gradient(135deg,var(--sky-lt),#d7e8dc);
   display:flex;align-items:center;justify-content:center;
   font-size:2.2rem;position:relative;overflow:hidden;
 }
@@ -180,7 +186,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 .exams-card-head{
   background:var(--amber-lt);border-bottom:1.5px solid var(--amber-bd);
   padding:.85rem 1.25rem;display:flex;align-items:center;gap:.6rem;
-  font-size:.93rem;font-weight:800;color:#92400e;
+  font-size:.93rem;font-weight:800;color:#75582c;
 }
 .exams-card-head i{color:var(--amber);}
 .exam-row{
@@ -195,14 +201,14 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   width:40px;height:40px;border-radius:10px;
   background:var(--amber-lt);border:1.5px solid var(--amber-bd);
   display:flex;align-items:center;justify-content:center;
-  color:#b45309;font-size:1rem;flex-shrink:0;
+  color:#9a7738;font-size:1rem;flex-shrink:0;
 }
 .exam-info{flex:1;min-width:0;}
 .exam-title{font-size:.9rem;font-weight:800;color:var(--ink);}
 .exam-meta{font-size:.73rem;color:var(--muted);margin-top:.15rem;}
 .exam-btn{
   display:inline-flex;align-items:center;gap:.35rem;
-  background:#b45309;color:#fff;
+  background:#a8813f;color:#fff;
   font-size:.78rem;font-weight:700;font-family:'Tajawal',sans-serif;
   padding:.4rem .9rem;border-radius:8px;border:none;
   text-decoration:none;transition:opacity .18s;white-space:nowrap;
@@ -217,6 +223,76 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   color:var(--muted);font-size:.85rem;
 }
 .no-exams i{display:block;font-size:1.5rem;opacity:.2;margin-bottom:.4rem;}
+.character-container{
+  position:fixed;
+  z-index:20;
+  left:1.5rem;
+  bottom:1rem;
+  width:14rem;
+  height:16rem;
+  overflow:visible;
+}
+.rafiq-speech{
+  position:absolute;
+  z-index:2;
+  right:1%;
+  bottom:100%;
+  width:min(250px,82vw);
+  padding:.8rem 1rem;
+  border:1px solid rgba(79,133,131,.22);
+  border-radius:16px 16px 4px 16px;
+  background:rgba(255,255,255,.96);
+  color:var(--schedule-ink);
+  box-shadow:0 10px 24px rgba(49,91,89,.18);
+  font-size:.88rem;
+  font-weight:700;
+  line-height:1.75;
+  text-align:right;
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .25s ease,transform .25s ease;
+  pointer-events:none;
+}
+.rafiq-speech.is-visible{opacity:1;transform:translateY(0);}
+.rafiq-speech::after{
+  content:'';
+  position:absolute;
+  bottom:-9px;
+  left:24px;
+  width:17px;
+  height:17px;
+  background:rgba(255,255,255,.96);
+  border-right:1px solid rgba(79,133,131,.22);
+  border-bottom:1px solid rgba(79,133,131,.22);
+  transform:rotate(45deg);
+}
+#intro-video{width:100%;height:100%;}
+.character-container + button[data-rafiq-toggle]{
+  display:none;
+  position:fixed;
+  z-index:20;
+  left:1.5rem;
+  bottom:1.5rem;
+  width:5rem;
+  height:5rem;
+  overflow:hidden;
+  border:0;
+  border-radius:50%;
+  background:linear-gradient(145deg,#5f958c,#315b59);
+  box-shadow:0 10px 24px rgba(49,91,89,.25);
+  cursor:pointer;
+  padding:.35rem;
+}
+.character-container + button[data-rafiq-toggle] img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:50%;
+}
+@media(max-width:600px){
+  .character-container{left:.5rem;bottom:.5rem;width:7rem;height:8.5rem;}
+  .character-container + button[data-rafiq-toggle]{left:.75rem;bottom:1rem;width:4rem;height:4rem;}
+}
 
 @media(max-width:600px){
   .lessons-grid{grid-template-columns:1fr 1fr;}
@@ -234,7 +310,7 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   <!-- رابط العودة -->
   <a href="{% url 'student:student_home' %}" class="back-link" style="display:inline-flex;margin-bottom:1rem;color:var(--muted);background:transparent;border:none;padding:0;">
     <i class="fas fa-chevron-right"></i>
-    العودة للمكتبة
+    
   </a>
 
   <!-- Header المادة -->
@@ -338,6 +414,16 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
 </div>
 
 <div id="lesson-thumbs-data" style="display:none;">{{ lesson_thumb_json }}</div>
+<div class="character-container">
+  <div class="rafiq-speech" role="status" aria-live="polite"></div>
+  <video id="intro-video" muted playsinline>
+    <source src="/media/videos/كلام_new.webm" type="video/webm">
+    متصفحك لا يدعم تشغيل الفيديو.
+  </video>
+</div>
+<button type="button" data-rafiq-toggle aria-label="إظهار رفيق">
+  <img src="{% static 'images/rafiq-avatar.jpeg' %}" alt="رفيق">
+</button>
 
 <script>
 /* صور الدروس من JSON */
@@ -384,5 +470,83 @@ body{background:var(--bg);color:var(--ink);direction:rtl;font-family:'Tajawal',s
   var el = document.getElementById('subj-emoji');
   if(el) el.textContent = emoji;
 })();
+  function showRafiqSpeech(text) {
+  const speechBubble = document.querySelector('.rafiq-speech');
+  if (!speechBubble || !text) return;
+
+  speechBubble.textContent = text.replace(/\s+/g, ' ').trim();
+  speechBubble.classList.add('is-visible');
+}
+
+async function playRafiqVoice(text) {
+  showRafiqSpeech(text);
+  try {
+    const response = await fetch('/api/generate-voice/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: text})
+    });
+    if (!response.ok) throw new Error('Voice generation failed');
+
+    const audioUrl = URL.createObjectURL(await response.blob());
+    const audio = new Audio(audioUrl);
+    audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl), {once: true});
+    await audio.play();
+  } catch (error) {
+    console.error('Error playing Rafiq voice:', error);
+  }
+}
+
+const video = document.getElementById('intro-video');
+const rafiqToggle = document.querySelector('[data-rafiq-toggle]');
+let rafiqMessage = '';
+
+function playRafiqMessage(text) {
+  if (!text) return;
+  rafiqMessage = text;
+  rafiqToggle.style.display = 'none';
+  document.querySelector('.character-container').style.display = 'block';
+  video.style.display = 'block';
+  video.currentTime = 0;
+  video.play().catch(() => {});
+  playRafiqVoice(text);
+}
+function buildRafiqMessage(data) {
+  const parts = [];
+
+  if (data.unfinished_lessons.length > 0) {
+    const lessonsText = data.unfinished_lessons.join('، ');
+    parts.push(`لسا عندك دروس ما خلصتها بمادة ${data.subject_name}: ${lessonsText}.`);
+  }
+
+  if (data.pending_tests.length > 0) {
+    const testsText = data.pending_tests.join('، ');
+    parts.push(`وكمان في اختبارات لسا ما قدمتها: ${testsText}.`);
+  }
+
+  return parts.join(' ');
+}
+
+rafiqToggle.addEventListener('click', () => playRafiqMessage(rafiqMessage));
+video.addEventListener('ended', () => {
+  video.style.display = 'none';
+  document.querySelector('.character-container').style.display = 'none';
+  rafiqToggle.style.display = 'block';
+});
+
+
+fetch("{% url 'student:unfinished_lessons_in_subject' subject.subjectid %}")
+  .then(r => r.json())
+  .then(data => {
+    let msg;
+    if (data.unfinished_lessons.length === 0 && data.pending_tests.length === 0) {
+      msg = `مَا هَذَا الإِنْجَازُ! لَقَدْ أَنْهَيْتَ كُلَّ دُرُوسِ وَاخْتِبَارَاتِ المَادَّةِ ${data.subject_name}. `;
+    } else {
+      msg = buildRafiqMessage(data);
+    }
+    playRafiqMessage(msg);
+  })
+  .catch(err => console.error('Failed to load unfinished lessons:', err));
+
 </script>
 {% endblock %}

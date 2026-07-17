@@ -1,19 +1,33 @@
 {# student_app/templates/student_app/chatbot_widget.html #}
 {# يُدرَج داخل lesson_session.html بـ: {% include 'student_app/chatbot_widget.html' %} #}
+{% load static %}
 
 <style>
 /* زر الفتح العائم */
 #chat-fab{
-  position:fixed;bottom:1.75rem;left:1.75rem;
-  width:58px;height:58px;border-radius:50%;
-  background:linear-gradient(135deg,#1d4ed8,#3b82f6);
+  position:fixed;bottom:2.5rem;left:3.5rem;
+  width:5rem;height:5rem;border-radius:50%;
+background:linear-gradient(145deg,#5f958c,#315b59);
   color:#fff;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   font-size:1.35rem;z-index:1100;
-  box-shadow:0 6px 24px rgba(29,78,216,.40);
+  box-shadow:0 10px 24px rgba(49,91,89,.25);
   transition:transform .2s,box-shadow .2s;
+  padding:.4rem;
 }
-#chat-fab:hover{transform:scale(1.08);box-shadow:0 8px 32px rgba(29,78,216,.55);}
+#chat-fab img{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:115%;
+  max-width:none;
+  height:auto;
+  clip-path:circle(38.3% at 50% 50%);
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+#chat-fab:hover{transform:translateY(-4px) rotate(-2deg);box-shadow:0 16px 28px rgba(64,58,50,.28);}
+#chat-fab:active{transform:translateY(5px);box-shadow:0 5px 12px rgba(64,58,50,.2);}
 .fab-badge{
   position:absolute;top:-4px;right:-4px;
   background:#ef4444;color:#fff;border-radius:50%;
@@ -39,14 +53,17 @@
 
 /* رأس الشات */
 .chat-head{
-  background:linear-gradient(120deg,#1e3a5f,#1d4ed8);
+  background:linear-gradient(135deg,#315b59,#6c9c89);
   color:#fff;padding:.85rem 1.1rem;
   display:flex;align-items:center;gap:.6rem;flex-shrink:0;
 }
 .chat-head-icon{
   width:38px;height:38px;background:rgba(255,255,255,.2);
   border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:1.05rem;flex-shrink:0;
+  font-size:1.05rem;flex-shrink:0;overflow:hidden;
+}
+.chat-head-icon img{
+  width:100%;height:100%;object-fit:cover;
 }
 .chat-head-info{flex:1;}
 .chat-head-title{font-size:.9rem;font-weight:800;line-height:1.2;}
@@ -78,6 +95,7 @@
   max-width:86%;padding:.6rem .85rem;border-radius:1rem;
   font-size:.84rem;line-height:1.6;word-break:break-word;
   font-family:'Tajawal',sans-serif;
+  position:relative;
 }
 .chat-msg.user{
   align-self:flex-start;
@@ -93,6 +111,50 @@
   align-self:flex-end;
   background:#fef2f2;color:#dc2626;border:1px solid #fecaca;
 }
+.msg-content{
+  margin-right:30px;
+}
+.voice-btn{
+  position:absolute;
+  top:5px;
+  left:5px;
+  width:24px;
+  height:24px;
+  border:none;
+  background:rgba(49,91,89,.1);
+  color:#315b59;
+  border-radius:50%;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.7rem;
+  transition:all .2s ease;
+}
+.voice-btn:hover{
+  background:rgba(49,91,89,.2);
+  transform:scale(1.1);
+}
+.voice-btn.playing{
+  background:#315b59;
+  color:#fff;
+  animation:pulse 1.5s infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.15);}
+}
+.word{
+  display:inline;
+  transition:background .2s ease,color .2s ease;
+  padding:0 2px;
+  border-radius:3px;
+}
+.word.highlighted{
+  background:rgba(49,91,89,.15);
+  color:#315b59;
+  font-weight:600;
+}
 .typing-dots{display:flex;gap:4px;padding:.2rem .4rem;align-items:center;}
 .typing-dots span{
   width:7px;height:7px;border-radius:50%;
@@ -106,7 +168,7 @@
   text-align:center;padding:.75rem;color:#64748b;
   font-size:.8rem;line-height:1.7;font-family:'Tajawal',sans-serif;
 }
-.chat-welcome strong{color:#1d4ed8;display:block;margin-bottom:.3rem;font-size:.87rem;}
+.chat-welcome strong{color:#6c9c89;display:block;margin-bottom:.3rem;font-size:.87rem;}
 
 /* منطقة الإدخال */
 .chat-input-area{
@@ -129,7 +191,7 @@
   cursor:pointer;border:none;transition:all 0.2s;
 }
 #chat-send{
-  background:#1d4ed8;color:#fff;font-size:.95rem;
+  background:linear-gradient(135deg,#315b59,#6c9c89);
 }
 #chat-send:hover{background:#3b82f6;}
 #chat-send:disabled{opacity:.45;cursor:not-allowed;}
@@ -158,13 +220,15 @@
       style="display:none;"></div>
 
 <button id="chat-fab" onclick="toggleChat()" title="اسأل المساعد الذكي">
-  <i class="fas fa-robot"></i>
+  <img src="{% static 'images/rafiq-avatar.jpeg' %}" alt="رفيق">
   <span class="fab-badge" id="fab-badge"></span>
 </button>
 
 <div id="chat-panel">
   <div class="chat-head">
-    <div class="chat-head-icon"><i class="fas fa-robot"></i></div>
+    <div class="chat-head-icon">
+      <img src="{% static 'images/rafiq-avatar.jpeg' %}" alt="رفيق">
+    </div>
     <div class="chat-head-info">
       <div class="chat-head-title">مساعد الدرس الذكي</div>
       <div class="chat-head-sub" id="chat-lesson-title">—</div>
@@ -175,8 +239,8 @@
 
   <div id="chat-messages">
     <div class="chat-welcome">
-      <strong>👋 أهلاً! أنا مساعدك الذكي</strong>
-      اسألني عن أي شيء يخص هذا الدرس وسأساعدك على الفهم 🎯
+      <strong>أهلاً! أنا مساعدك الذكي</strong>
+      اسألني عن أي شيء يخص هذا الدرس وسأساعدك على الفهم
     </div>
   </div>
 
@@ -189,7 +253,7 @@
       onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
     
     <button id="chat-send" class="chat-btn" onclick="sendChat()" title="إرسال">
-      <i class="fas fa-paper-plane"></i>
+      <i class="fas fa-paper-plane" style="color: #fff;"></i>
     </button>
   </div>
 </div>
@@ -208,6 +272,7 @@
   var chatLoading = false;
   var chatRemaining = _chatLimit - _chatUsed;
   var chatHistory = [];
+  var currentAudio = null; // لتخزين كائن الصوت النشط
 
   // --- نظام التعرف على الكلام (Speech Recognition) ---
   var recognition = null;
@@ -276,6 +341,119 @@
     if(btn) btn.classList.remove('active');
   }
 
+  // --- نظام توليد الصوت (Text-to-Speech) ---
+  async function playRafiqVoice(text) {
+    try {
+      // إيقاف أي صوت نشط
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+
+      const response = await fetch('/api/generate-voice/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      });
+
+      if (!response.ok) throw new Error('Voice generation failed');
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      currentAudio = audio;
+
+      return new Promise((resolve, reject) => {
+        audio.addEventListener('ended', () => {
+          URL.revokeObjectURL(audioUrl);
+          currentAudio = null;
+          resolve();
+        });
+        audio.addEventListener('error', (e) => {
+          URL.revokeObjectURL(audioUrl);
+          currentAudio = null;
+          reject(e);
+        });
+        audio.play().catch(err => {
+          console.log(err);
+          currentAudio = null;
+          reject(err);
+        });
+      });
+
+    } catch (error) {
+      console.error('Error playing voice:', error);
+      currentAudio = null;
+    }
+  }
+
+  function stopVoice() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+  }
+
+  // تشغيل صوت رسالة معينة مع تظليل الكلمات
+  window.playMessageVoice = function(btn) {
+    var msgDiv = btn.closest('.chat-msg');
+    var contentDiv = msgDiv.querySelector('.msg-content');
+    var text = contentDiv ? contentDiv.innerText : '';
+    
+    if (!text) return;
+    
+    // إذا كان الصوت يعمل، أوقفه
+    if (btn.classList.contains('playing')) {
+      stopVoice();
+      btn.classList.remove('playing');
+      // إعادة النص الأصلي
+      if (contentDiv) contentDiv.innerText = text;
+      return;
+    }
+    
+    // إيقاف أي صوت نشط
+    stopVoice();
+    
+    // تغيير حالة الزر
+    document.querySelectorAll('.voice-btn').forEach(function(b) {
+      b.classList.remove('playing');
+    });
+    btn.classList.add('playing');
+    
+    // تقسيم النص إلى كلمات للتظليل
+    var words = text.split(/\s+/);
+    contentDiv.innerHTML = words.map(function(word, index) {
+      return '<span class="word" data-index="' + index + '">' + word + '</span>';
+    }).join(' ');
+    
+    // تشغيل الصوت
+    playRafiqVoice(text).then(function() {
+      btn.classList.remove('playing');
+      // إعادة النص الأصلي
+      contentDiv.innerText = text;
+    }).catch(function() {
+      btn.classList.remove('playing');
+      contentDiv.innerText = text;
+    });
+    
+    // تظليل الكلمات بشكل متتابع (تقريبي)
+    var wordElements = contentDiv.querySelectorAll('.word');
+    var duration = 3000; // تقدير مدة الصوت بالمللي ثانية
+    var wordDelay = duration / words.length;
+    
+    wordElements.forEach(function(wordEl, index) {
+      setTimeout(function() {
+        wordElements.forEach(function(w) {
+          w.classList.remove('highlighted');
+        });
+        wordEl.classList.add('highlighted');
+      }, index * wordDelay);
+    });
+  };
+
   // --- وظائف الشات الأساسية ---
   window.toggleChat = function() {
     chatOpen = !chatOpen;
@@ -284,9 +462,22 @@
     if(!panel) return;
 
     panel.classList.toggle('open', chatOpen);
-    fab.innerHTML = chatOpen ? '<i class="fas fa-times"></i>' : '<i class="fas fa-robot"></i>';
+    // لا نغير innerHTML لأن الصورة موجودة بالفعل
 
     if (chatOpen) {
+      // إيقاف الصوت عند فتح المساعد الذكي
+      stopVoice();
+      
+      // إيقاف تتبع الانتباه إذا كان يعمل
+      if (typeof stopAttentionTracking === 'function') {
+        stopAttentionTracking();
+      }
+      
+      // إيقاف التسجيل الصوتي إذا كان يعمل
+      if (isRecognizing) {
+        recognition.stop();
+      }
+      
       // إيقاف الصوت/الفيديو عند فتح المساعد الذكي
       var audio = document.getElementById('topAudio');
       if (audio && !audio.paused) {
@@ -332,7 +523,7 @@
     if (!msg) return;
 
     if (chatRemaining <= 0) {
-      appendMsg('bot', '🌟 لقد استهلكت محاولاتك اليوم، نراك غداً بنشاط جديد!');
+      appendMsg('bot', 'لقد استهلكت محاولاتك اليوم، نراك غداً بنشاط جديد!');
       return;
     }
 
@@ -363,7 +554,7 @@
       if(sendBtn) sendBtn.disabled = false;
 
       if (data.ok) {
-        appendMsg('bot', data.reply);
+        appendMsg('bot', data.reply, false, true);
         chatHistory.push({role:'user', parts:[{text:msg}]});
         chatHistory.push({role:'model', parts:[{text:data.reply}]});
         if (data.remaining !== undefined) updateQuotaUI(data.remaining);
@@ -375,7 +566,7 @@
       removeTyping(tid);
       chatLoading = false;
       if(sendBtn) sendBtn.disabled = false;
-      appendMsg('bot', '📡 خطأ في الاتصال.', true);
+      appendMsg('bot', 'خطأ في الاتصال.', true);
     });
   };
 
@@ -385,12 +576,37 @@
     if(badge) badge.textContent = Math.max(0, chatRemaining) + ' رسالة متبقية';
   }
 
-  function appendMsg(type, text, isErr) {
+  function appendMsg(type, text, isErr, isNewBotMsg) {
     var m = document.getElementById('chat-messages');
     if(!m) return;
     var d = document.createElement('div');
     d.className = 'chat-msg ' + type + (isErr ? ' error-msg' : '');
-    d.innerText = text;
+    
+    // إزالة الحروف الإنجليزية من النص
+    var cleanText = text.replace(/[a-zA-Z]/g, '').trim();
+    
+    // إضافة زر تشغيل الصوت لرسائل البوت
+    if (type === 'bot' && !isErr) {
+      d.innerHTML = `
+        <div class="msg-content">${cleanText}</div>
+        <button class="voice-btn" onclick="playMessageVoice(this)" title="تشغيل الصوت">
+          <i class="fas fa-volume-up"></i>
+        </button>
+      `;
+      
+      // تشغيل الصوت تلقائياً للرسائل الجديدة من البوت
+      if (isNewBotMsg && cleanText) {
+        setTimeout(function() {
+          var btn = d.querySelector('.voice-btn');
+          if (btn) {
+            playMessageVoice(btn);
+          }
+        }, 500);
+      }
+    } else {
+      d.innerText = cleanText;
+    }
+    
     m.appendChild(d);
     scrollChat();
   }

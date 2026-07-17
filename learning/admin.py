@@ -151,3 +151,12 @@ for model in other_models:
         admin.site.register(model)
     except AlreadyRegistered:
         pass
+from django.contrib import admin
+from django.contrib import admin
+from learning.models import StudentTeacherAssignment
+
+@admin.register(StudentTeacherAssignment)
+class StudentTeacherAssignmentAdmin(admin.ModelAdmin):
+    # جلب جميع الحقول الأساسية للموديل تلقائياً لتجنب أخطاء التسمية
+    def get_list_display(self, request):
+        return [field.name for field in self.model._meta.fields if not field.remote_field]

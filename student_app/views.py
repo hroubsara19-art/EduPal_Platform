@@ -1490,6 +1490,69 @@ def video_serve(request, path):
     
     return response
 @_student_required
+def unfinished_lessons_in_subject(request, subject_id):
+    """Returns unfinished lessons and pending tests for a specific subject, for Rafiq to speak."""
+    student = request.student
+    if not student:
+        return JsonResponse({
+            'unfinished_lessons': [],
+            'pending_tests': [],
+            'subject_name': ''
+        })
+    
+    try:
+        subject = Subject.objects.get(pk=subject_id)
+    except Subject.DoesNotExist:
+        return JsonResponse({
+            'unfinished_lessons': [],
+            'pending_tests': [],
+            'subject_name': ''
+        })
+    
+    # Get lessons for this subject
+    lessons = Lessoncontent.objects.filter(
+        subjectid=subject,
+        status='Published'
+    )
+    
+    # Get watched lessons
+    watched_lesson_ids = set(
+        LessonWatch.objects.filter(
+            studentid=student,
+            lessonid__in=lessons
+        ).values_list('lessonid_id', flat=True)
+    )
+    
+    # Get unfinished lessons
+    unfinished_lessons = []
+    for lesson in lessons:
+        if lesson.pk not in watched_lesson_ids:
+            unfinished_lessons.append(lesson.lessontitle)
+    
+    # Get tests for this subject
+    tests = Test.objects.filter(subjectid=subject)
+    
+    # Get attempted test IDs
+    attempted_test_ids = set(
+        Testattempt.objects.filter(
+            studentid=student,
+            testid__in=tests
+        ).values_list('testid_id', flat=True)
+    )
+    
+    # Get pending tests
+    pending_tests = []
+    for test in tests:
+        if test.pk not in attempted_test_ids:
+            pending_tests.append(test.testtitle)
+    
+    return JsonResponse({
+        'unfinished_lessons': unfinished_lessons,
+        'pending_tests': pending_tests,
+        'subject_name': subject.subjectname
+    })
+
+@_student_required
 def unfinished_subjects(request):
     """Returns subject names the student hasn't finished, for Rafiq to speak."""
     student = request.student

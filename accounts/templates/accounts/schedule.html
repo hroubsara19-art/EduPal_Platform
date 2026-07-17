@@ -255,6 +255,78 @@ textarea.form-control{min-height:auto;}
   .container-fluid[dir="rtl"] h3{font-size:1.06rem;}
   .container-fluid[dir="rtl"] > .card{border-radius:15px!important;}
 }
+
+/* شخصية رفيق (نفس العناصر المستخدمة في صفحة الطالب) */
+.character-container{
+  position:fixed;
+  z-index:20;
+  left:1.5rem;
+  bottom:1rem;
+  width:14rem;
+  height:16rem;
+  overflow:visible;
+}
+.rafiq-speech{
+  position:absolute;
+  z-index:2;
+  right:1%;
+  bottom:100%;
+  width:min(250px,82vw);
+  padding:.8rem 1rem;
+  border:1px solid rgba(79,133,131,.22);
+  border-radius:16px 16px 4px 16px;
+  background:rgba(255,255,255,.96);
+  color:var(--schedule-ink);
+  box-shadow:0 10px 24px rgba(49,91,89,.18);
+  font-size:.88rem;
+  font-weight:700;
+  line-height:1.75;
+  text-align:right;
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .25s ease,transform .25s ease;
+  pointer-events:none;
+}
+.rafiq-speech.is-visible{opacity:1;transform:translateY(0);}
+.rafiq-speech::after{
+  content:'';
+  position:absolute;
+  bottom:-9px;
+  left:24px;
+  width:17px;
+  height:17px;
+  background:rgba(255,255,255,.96);
+  border-right:1px solid rgba(79,133,131,.22);
+  border-bottom:1px solid rgba(79,133,131,.22);
+  transform:rotate(45deg);
+}
+#intro-video{width:100%;height:100%;}
+.character-container + button[data-rafiq-toggle]{
+  display:none;
+  position:fixed;
+  z-index:20;
+  left:1.5rem;
+  bottom:1.5rem;
+  width:5rem;
+  height:5rem;
+  overflow:hidden;
+  border:0;
+  border-radius:50%;
+  background:linear-gradient(145deg,#5f958c,#315b59);
+  box-shadow:0 10px 24px rgba(49,91,89,.25);
+  cursor:pointer;
+  padding:.35rem;
+}
+.character-container + button[data-rafiq-toggle] img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:50%;
+}
+@media(max-width:600px){
+  .character-container{left:.5rem;bottom:.5rem;width:7rem;height:8.5rem;}
+  .character-container + button[data-rafiq-toggle]{left:.75rem;bottom:1rem;width:4rem;height:4rem;}
+}
 </style>
 {% endblock %}
 
@@ -297,6 +369,19 @@ textarea.form-control{min-height:auto;}
   </div>
 
 </div>
+
+{% if role == 'Student' %}
+<div class="character-container">
+  <div class="rafiq-speech" role="status" aria-live="polite"></div>
+  <video id="intro-video" muted playsinline>
+    <source src="/media/videos/كلام_new.webm" type="video/webm">
+    متصفحك لا يدعم تشغيل الفيديو.
+  </video>
+</div>
+<button type="button" data-rafiq-toggle aria-label="إظهار رفيق">
+  <img src="{% static 'images/rafiq-avatar.jpeg' %}" alt="رفيق">
+</button>
+{% endif %}
 
 <!-- ══ Modal: إضافة / تعديل ══ -->
 {% if role == 'Teacher' %}
@@ -1069,5 +1154,77 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 })();
+
 </script>
+
+{% if role == 'Student' %}
+<script>
+// ─── Rafiq المساعد الذكي ─────────────────────────────────────
+function showRafiqSpeech(text) {
+  const speechBubble = document.querySelector('.rafiq-speech');
+  if (!speechBubble || !text) return;
+
+  speechBubble.textContent = text.replace(/\s+/g, ' ').trim();
+  speechBubble.classList.add('is-visible');
+}
+
+async function playRafiqVoice(text) {
+  showRafiqSpeech(text);
+  try {
+    const response = await fetch('/api/generate-voice/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: text})
+    });
+    if (!response.ok) throw new Error('Voice generation failed');
+
+    const audioUrl = URL.createObjectURL(await response.blob());
+    const audio = new Audio(audioUrl);
+    audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl), {once: true});
+    await audio.play();
+  } catch (error) {
+    console.error('Error playing Rafiq voice:', error);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const video = document.getElementById('intro-video');
+  const rafiqToggle = document.querySelector('[data-rafiq-toggle]');
+  let rafiqMessage = '';
+
+  function playRafiqMessage(text) {
+    if (!text) return;
+    rafiqMessage = text;
+    rafiqToggle.style.display = 'none';
+    document.querySelector('.character-container').style.display = 'block';
+    video.style.display = 'block';
+    video.currentTime = 0;
+    video.play().catch(() => {});
+    playRafiqVoice(text);
+  }
+
+  if (rafiqToggle) {
+    rafiqToggle.addEventListener('click', () => playRafiqMessage(rafiqMessage));
+  }
+
+  if (video) {
+    video.addEventListener('ended', () => {
+      video.style.display = 'none';
+      document.querySelector('.character-container').style.display = 'none';
+      rafiqToggle.style.display = 'block';
+    });
+  }
+
+  fetch("{% url 'accounts:rafiq_today_schedule' %}", {
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.message) playRafiqMessage(d.message);
+  })
+  .catch(() => console.error('Failed to load today schedule for Rafiq'));
+});
+</script>
+{% endif %}
+
 {% endblock %}
