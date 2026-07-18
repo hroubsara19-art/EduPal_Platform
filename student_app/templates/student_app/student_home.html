@@ -593,7 +593,7 @@ height: 100%;
 {% endblock %}
 
 {% block content %}
-<div id="has-any-subjects" style="display:none;">{{ has_any_subjects|lower }}</div>
+<div id="has-any-subjects" data-value="{{ has_any_subjects|yesno:'true,false' }}" style="display:none;"></div>
 <div class="page-wrap" dir="rtl">
 
   <!-- بانر الترحيب -->
@@ -974,7 +974,7 @@ async function startRafiqIntro(video) {
     try {
         // ✅ التحقق من وجود مواد مسندة للطالب فعلياً (مسجّل عند معلم/معلمين)
         const hasAnySubjectsEl = document.getElementById('has-any-subjects');
-        const hasAnySubjects = hasAnySubjectsEl ? hasAnySubjectsEl.textContent === 'true' : false;
+        const hasAnySubjects = hasAnySubjectsEl ? hasAnySubjectsEl.getAttribute('data-value') === 'true' : false;
         
         if (!hasAnySubjects) {
             // ✅ لا توجد أي مادة مسندة للطالب إطلاقاً بعد -> رسالة "بانتظار أن يضيفك المعلم"
