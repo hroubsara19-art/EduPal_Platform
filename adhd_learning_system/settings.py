@@ -94,7 +94,8 @@ DATABASES = {
         conn_health_checks=True,
     )
 }
-DATABASES['default']['OPTIONS'] = {'connect_timeout': 10}
+# التعديل: رفع مهلة الاتصال إلى 30 ثانية لتفادي الـ 502 الناتجة عن ضغط السيرفر
+DATABASES['default']['OPTIONS'] = {'connect_timeout': 30}
 
 # ── كلمات المرور ─────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
