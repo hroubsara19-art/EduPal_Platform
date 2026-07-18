@@ -18,16 +18,16 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='vrlesson',
             name='design_platform_url',
-            field=models.URLField(db_column='DesignPlatformURL', default='https://ai.studio/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true', help_text='ط±ط§ط¨ط· ظ…ظ†طµط© طھطµظ…ظٹظ… ط¨ظٹط¦ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ', max_length=1000),
+            field=models.URLField(db_column='DesignPlatformURL', default='https://ai.studio/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true', help_text='رابط منصة تصميم بيئة الواقع الافتراضي', max_length=1000),
         ),
         migrations.AlterField(
             model_name='vrlesson',
             name='is_published',
-            field=models.BooleanField(db_column='IsPublished', default=False, help_text='ظ‡ظ„ طھظ… ظ†ط´ط± طھط¬ط±ط¨ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ظ„ظ„ط·ط§ظ„ط¨طں'),
+            field=models.BooleanField(db_column='IsPublished', default=False, help_text='هل تم نشر تجربة الواقع الافتراضي للطالب؟'),
         ),
         migrations.AlterField(
             model_name='vrlesson',
             name='vr_url',
-            field=models.URLField(db_column='VR_URL', help_text='ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…طµظ…ظ… ظ…ظ† ظ‚ط¨ظ„ ط§ظ„ظ…ط¹ظ„ظ…', max_length=1000),
+            field=models.URLField(db_column='VR_URL', help_text='رابط منصة الواقع الافتراضي المصمم من قبل المعلم', max_length=1000),
         ),
     ]

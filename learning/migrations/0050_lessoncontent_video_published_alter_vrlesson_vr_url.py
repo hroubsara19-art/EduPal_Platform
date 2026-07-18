@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='vrlesson',
             name='vr_url',
-            field=models.URLField(blank=True, db_column='VR_URL', help_text='ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…طµظ…ظ… ظ…ظ† ظ‚ط¨ظ„ ط§ظ„ظ…ط¹ظ„ظ…', max_length=1000, null=True),
+            field=models.URLField(blank=True, db_column='VR_URL', help_text='رابط منصة الواقع الافتراضي المصمم من قبل المعلم', max_length=1000, null=True),
         ),
     ]

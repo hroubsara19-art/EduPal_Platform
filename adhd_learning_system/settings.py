@@ -1,10 +1,9 @@
 """
-settings.py — EduPal ADHD Learning System
-══════════════════════════════════════════
-ملف .env المطلوب في جذر المشروع:
-  SECRET_KEY, DEBUG, ALLOWED_HOSTS,
-  DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT,
-  EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, HF_API_TOKEN
+settings.py — EduPal ADHD Learning System (Production Ready)
+══════════════════════════════════════════════════════════
+ملف .env المطلوب في جذر المشروع للتطوير المحلي فقط:
+  SECRET_KEY, DEBUG, ALLOWED_HOSTS, DATABASE_URL,
+  EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, HF_API_TOKEN, API_ENCRYPTION_KEY
 """
 
 from pathlib import Path
@@ -13,6 +12,7 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# تحميل ملف .env للتطوير المحلي فقط (بيئة Render تقرأ من الإعدادات مباشرة)
 try:
     from dotenv import load_dotenv
     load_dotenv(BASE_DIR / '.env')
@@ -24,8 +24,14 @@ SECRET_KEY = os.environ.get(
     'SECRET_KEY',
     'django-insecure-change-me-before-production'
 )
-DEBUG          = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS  = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+
+# استقبال الهوستس ديناميكياً لتشمل سيرفرات Render والمحلي و ngrok
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS', 
+    'localhost,127.0.0.1,gigantic-dice-unheated.ngrok-free.dev,.onrender.com'
+).split(',')
 
 # ── التطبيقات ────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -45,7 +51,7 @@ INSTALLED_APPS = [
 # ── Middleware ───────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # إدارة الملفات الثابتة في الإنتاج
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -76,16 +82,16 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = 'adhd_learning_system.wsgi.application'
 
-# ── قاعدة البيانات ───────────────────────────────────────────
-DATABASES = {'default': {
-    'ENGINE':   'django.db.backends.postgresql',
-    'NAME':     os.environ.get('DB_NAME',     'ADHD_Learning_System'),
-    'USER':     os.environ.get('DB_USER',     'postgres'),
-    'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-    'HOST':     os.environ.get('DB_HOST',     'localhost'),
-    'PORT':     os.environ.get('DB_PORT',     '5432'),
-    'OPTIONS':  {'connect_timeout': 10},
-}}
+# ── قاعدة البيانات (PostgreSQL) ───────────────────────────────
+# الربط عبر رابط DATABASE_URL الموحد لمنصة Render مع الحفاظ على مهلة الاتصال
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'postgresql://postgres:@localhost:5432/ADHD_Learning_System'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+DATABASES['default']['OPTIONS'] = {'connect_timeout': 10}
 
 # ── كلمات المرور ─────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -108,32 +114,35 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT      = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL        = '/media/'
 MEDIA_ROOT       = os.path.join(BASE_DIR, 'media')
-SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Cache — لـ Rate Limiting و Sessions ──────────────────────
-# في التطوير: locmem (افتراضي) — يعمل تلقائياً
-# في الإنتاج: نفّذ: python manage.py createcachetable
 CACHES = {
     'default': {
         'BACKEND':  'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'django_cache_table',
-        'TIMEOUT':  300,   # 5 دقائق (يمكن تغييره)
+        'TIMEOUT':  300,
     }
 }
 AUTH_USER_MODEL    = 'learning.User'
 
 # ── الجلسات ──────────────────────────────────────────────────
-SESSION_COOKIE_AGE         = 10800   # 3 ساعات (أقصى مدة من تسجيل الدخول)
-SESSION_SAVE_EVERY_REQUEST = True    # يُجدّد الـ cookie عند كل طلب
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # تنتهي بالوقت لا بإغلاق المتصفح
-SESSION_COOKIE_HTTPONLY    = True    # يمنع JS من قراءة الـ Cookie
-SESSION_COOKIE_SAMESITE    = 'Lax'  # حماية CSRF
+SESSION_COOKIE_AGE         = 10800
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_HTTPONLY    = True
+SESSION_COOKIE_SAMESITE    = 'Lax'
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
 # ── CSRF ─────────────────────────────────────────────────────
-CSRF_COOKIE_HTTPONLY = False   # يجب أن يكون False ليقرأه JS عند الحاجة
+CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_TRUSTED_ORIGINS = ['https://gigantic-dice-unheated.ngrok-free.dev']
+CSRF_TRUSTED_ORIGINS = [
+    'https://gigantic-dice-unheated.ngrok-free.dev',
+    'https://*.onrender.com'  # قبول أي رابط فرعي تولده منصة Render تلقائياً
+]
+
 # ── المصادقة ─────────────────────────────────────────────────
 LOGIN_URL           = 'accounts:login'
 LOGIN_REDIRECT_URL  = 'accounts:home'
@@ -141,11 +150,8 @@ LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # ── مفاتيح API ───────────────────────────────────────────────
 HF_API_TOKEN       = os.environ.get('HF_API_TOKEN', '')
-API_ENCRYPTION_KEY = os.environ.get('API_ENCRYPTION_KEY', '')  # مطلوب لتشفير مفاتيح API
-ALLOWED_HOSTS = ['gigantic-dice-unheated.ngrok-free.dev', 
-    '127.0.0.1', 
-    'localhost']
-ALLOWED_HOSTS = ['*']
+API_ENCRYPTION_KEY = os.environ.get('API_ENCRYPTION_KEY', '')
+
 # ── البريد الإلكتروني ────────────────────────────────────────
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST          = 'smtp.gmail.com'
@@ -155,19 +161,29 @@ EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER',     '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@edupal.com')
 
-# ── إعدادات الأمان في الإنتاج (DEBUG=False) ──────────────────
+# ── إعدادات الأمان وسياسة الصلاحيات ───────────────────────────
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+SECURE_PERMISSIONS_POLICY = {
+    "microphone": ["self"],
+    "camera": ["self"],
+    "display-capture": ["self"],
+}
+
+# تفعيل طبقات الحماية الصارمة تلقائياً فقط عندما يكون DEBUG = False في الإنتاج
 if not DEBUG:
-    SECURE_SSL_REDIRECT            = False
-    SESSION_COOKIE_SECURE          = False
-    CSRF_COOKIE_SECURE             = False
+    SECURE_SSL_REDIRECT            = True
+    SESSION_COOKIE_SECURE          = True
+    CSRF_COOKIE_SECURE             = True
     SECURE_HSTS_SECONDS            = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD            = True
     SECURE_CONTENT_TYPE_NOSNIFF    = True
     X_FRAME_OPTIONS                = 'SAMEORIGIN'
     SECURE_BROWSER_XSS_FILTER      = True
-    SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
-# ── إخفاء SessionInterrupted من الـ logs (غير ضار — يحدث عند polling بعد logout) ──
+    SECURE_REFERRER_POLICY         = "no-referrer-when-downgrade"
+
+# ── إخفاء SessionInterrupted من الـ logs ─────────────────────
 import logging as _logging
 
 class _IgnoreSessionInterrupted(_logging.Filter):
@@ -178,11 +194,6 @@ class _IgnoreSessionInterrupted(_logging.Filter):
 
 _logging.getLogger('django.request').addFilter(_IgnoreSessionInterrupted())
 
-SECURE_PERMISSIONS_POLICY = {
-    "microphone": ["self"],
-    "camera": ["self"],
-    "display-capture": ["self"],
-}
 # ── Logging ──────────────────────────────────────────────────
 LOGGING = {
     'version': 1,

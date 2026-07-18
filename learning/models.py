@@ -896,9 +896,9 @@ class LearningStateSnapshot(models.Model):
 # â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
 class VRLesson(models.Model):
     """
-    ظ†ظ…ظˆط°ط¬ طھط®ط²ظٹظ† طھط¬ط§ط±ط¨ ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…ط±طھط¨ط·ط© ط¨ط§ظ„ط¯ط±ظˆط³
-    - ظٹط±ط¨ط· ظƒظ„ ط¯ط±ط³ ط¨طھط¬ط±ط¨ط© ظˆط§ظ‚ط¹ ط§ظپطھط±ط§ط¶ظٹ ظپط±ظٹط¯ط©
-    - ظٹط­طھظپط¸ ط¨ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„طھطµظ…ظٹظ… ظˆط§ظ„ط±ط§ط¨ط· ط§ظ„ظ†ظ‡ط§ط¦ظٹ ظ„ظ„ط·ط§ظ„ط¨
+    نموذج تخزين تجارب الواقع الافتراضي المرتبطة بالدروس
+    - يربط كل درس بتجربة واقع افتراضي فريدة
+    - يحفظ برابط منصة التصميم والرابط النهائي للطالب
     """
     vr_id = models.AutoField(db_column='VR_ID', primary_key=True)
     lesson = models.OneToOneField(
@@ -931,13 +931,13 @@ class VRLesson(models.Model):
         max_length=1000,
         null=True,
         blank=True,
-        help_text='ط±ط§ط¨ط· ظ…ظ†طµط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ط§ظ„ظ…طµظ…ظ… ظ…ظ† ظ‚ط¨ظ„ ط§ظ„ظ…ط¹ظ„ظ…'
+        help_text='رابط منصة الواقع الافتراضي المصمم من قبل المعلم'
     )
     design_platform_url = models.URLField(
         db_column='DesignPlatformURL',
         default='https://ai.studio/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true',
         max_length=1000,
-        help_text='ط±ط§ط¨ط· ظ…ظ†طµط© طھطµظ…ظٹظ… ط¨ظٹط¦ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ'
+        help_text='رابط منصة تصميم بيئة الواقع الافتراضي'
     )
     vr_attachment = models.FileField(
         db_column='VR_Attachment',
@@ -949,7 +949,7 @@ class VRLesson(models.Model):
     is_published = models.BooleanField(
         db_column='IsPublished',
         default=False,
-        help_text='ظ‡ظ„ طھظ… ظ†ط´ط± طھط¬ط±ط¨ط© ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط§ظپطھط±ط§ط¶ظٹ ظ„ظ„ط·ط§ظ„ط¨طں'
+        help_text='هل تم نشر تجربة الواقع الافتراضي للطالب؟'
     )
     created_at = models.DateTimeField(
         db_column='CreatedAt',
