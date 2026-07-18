@@ -65,7 +65,7 @@ def vr_lesson_setup(request):
         form = VRLessonSetupForm(teacher=teacher)
     
     # بيانات إضافية لتمرير رابط منصة التصميم
-    design_platform_url = 'https://ai.studio/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true'
+    design_platform_url = 'https://aistudio.google.com/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true&showPreview=true&showAssistant=true'
     
     return render(request, 'learning/vr_lesson_setup.html', {
         'form': form,

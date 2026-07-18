@@ -41,7 +41,7 @@ class VRLesson(models.Model):
     )
     design_platform_url = models.URLField(
         db_column='DesignPlatformURL',
-        default='https://ai.studio/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true',
+        default='https://aistudio.google.com/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true&showPreview=true&showAssistant=true',
         max_length=1000,
         help_text='رابط منصة تصميم بيئة الواقع الافتراضي'
     )

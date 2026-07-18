@@ -1012,6 +1012,10 @@ def lesson_vr_experience(request, lesson_id):
     from learning.models import VRLesson, StudentVRInteraction
     try:
         vr_lesson = VRLesson.objects.get(lesson=lesson, is_published=True)
+        
+        # استخدام الرابط الافتراضي إذا كان vr_url فارغاً
+        if not vr_lesson.vr_url:
+            vr_lesson.vr_url = 'https://aistudio.google.com/apps/ea0032ea-b331-4cc8-a5fd-e59bbce58fbe?fullscreenApplet=true&showPreview=true&showAssistant=true'
 
         # إنشاء أو الحصول على سجل التفاعل - فقط إذا كان الطالب موجوداً
         interaction = None
