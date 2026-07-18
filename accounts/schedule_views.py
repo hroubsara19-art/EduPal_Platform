@@ -8,6 +8,9 @@ accounts/schedule_views.py
   ③ حفظ start_time/end_time كـ time objects وليس strings (TimeField يقبل الاثنين لكن المقارنة تتطلب objects)
   ④ _conflict_check: دالة مشتركة لتفادي التكرار
   ⑤ schedule_edit: تحديد target_subject/target_class أولاً ثم الفحص
+  ⑥ [جديد] _build_rafiq_message: إذا لا توجد مواعيد اليوم → رسالة واضحة بذلك.
+     إذا وُجدت مواعيد → لكل موعد: اسم المادة، نوعه (حصة/اختبار)، اسم المعلم،
+     والوقت المتبقي حتى بدايته (ساعات/دقائق).
 """
 import json
 from datetime import date, time, timedelta, datetime
@@ -91,7 +94,7 @@ def _conflict_check(class_obj, entry_date, s_new, e_new, entry_type, exclude_ent
         class_obj        — Class instance (الصف المستهدف)
         entry_date       — date object
         s_new / e_new    — time objects (بداية/نهاية الموعد الجديد)
-        entry_type       — 'lesson' | 'exam'
+        entry_type        — 'lesson' | 'exam'
         exclude_entry_id — entry_id للمدخل الحالي عند التعديل (يُستثنى من الفحص)
 
     الإرجاع:
@@ -462,6 +465,11 @@ def _notify_students_schedule(entry, action='add'):
         pass
     if notifs:
         Notification.objects.bulk_create(notifs)
+
+
+# ══════════════════════════════════════════════════════════════
+# رفيق: جدول اليوم
+# ══════════════════════════════════════════════════════════════
 @login_required
 def rafiq_today_schedule(request):
     now   = datetime.now()
@@ -489,24 +497,68 @@ def rafiq_today_schedule(request):
     else:
         return JsonResponse({'entries': [], 'message': ''})
 
-    entries = qs.select_related('subject').filter(
+    entries = qs.select_related('subject', 'teacher__userid').filter(
         entry_date=today,
         end_time__gt=now.time()
     ).order_by('start_time')
 
     data = [_serialize_entry(e) for e in entries]
-    message = _build_rafiq_message(data)
+    message = _build_rafiq_message(data, now)
     print("Entries:", data)
     print("Message:", message)
 
     return JsonResponse({'entries': data, 'message': message})
-def _build_rafiq_message(entries):
-    if not entries:
-        return "أَهْلًا يَا بَطَلُ! أَنْهَيْتَ كُلَّ مَوَاعِيدِكَ لِهَذَا اليَوْمِ."
 
-    parts = [f"{e['type_display']} {e['subject']} الساعة {e['start_time']}" for e in entries]
+
+def _format_remaining(seconds_left):
+    """
+    يحوّل عدد الثواني المتبقية إلى نص عربي مقروء.
+    مثال: 5400 ثانية → 'بعد ساعة و30 دقيقة'
+    """
+    if seconds_left <= 0:
+        return "الآن"
+
+    total_minutes = int(seconds_left // 60)
+    hours   = total_minutes // 60
+    minutes = total_minutes % 60
+
+    if hours > 0 and minutes > 0:
+        return f"بعد {hours} ساعة و{minutes} دقيقة"
+    if hours > 0:
+        return f"بعد {hours} ساعة"
+    if minutes > 0:
+        return f"بعد {minutes} دقيقة"
+    return "خلال لحظات"
+
+
+def _build_rafiq_message(entries, now=None):
+    """
+    يبني رسالة رفيق الصوتية عن مواعيد اليوم.
+
+    - لا توجد مواعيد اليوم → رسالة واضحة بعدم وجود مواعيد.
+    - توجد مواعيد → لكل موعد: اسم المادة، نوعه (حصة/اختبار)،
+      اسم المعلم، والوقت المتبقي حتى بدايته.
+    """
+    if not entries:
+        return "أَهْلًا يَا بَطَلُ! لَا يُوجَدُ أَيُّ مَوَاعِيدَ لَكَ اليَوْمَ."
+
+    now = now or datetime.now()
+
+    parts = []
+    for e in entries:
+        try:
+            start_dt = datetime.combine(now.date(), _parse_time(e['start_time']))
+            seconds_left = (start_dt - now).total_seconds()
+            remaining_str = _format_remaining(seconds_left)
+        except Exception:
+            remaining_str = ""
+
+        piece = f"{e['subject']} ({e['type_display']}) مع الأستاذ {e['teacher']} الساعة {e['start_time']}"
+        if remaining_str:
+            piece += f" — {remaining_str}"
+        parts.append(piece)
 
     if len(parts) == 1:
-        return f" أَهْلًا يَا بَطَلُ! لَا تَنْسَ مَوَاعِيدَ اليَوْمِ لَدَيْكَ {parts[0]}"
+        return f"أَهْلًا يَا بَطَلُ! لَدَيْكَ مَوْعِدٌ اليَوْمَ: {parts[0]}."
 
-    return " أَهْلًا يَا بَطَلُ! لَا تَنْسَ مَوَاعِيدَ اليَوْمِ لَدَيْكَ " + "، وبعدها ".join(parts)
+    return "أَهْلًا يَا بَطَلُ! لَدَيْكَ عِدَّةُ مَوَاعِيدَ اليَوْمَ: " + "، ثم ".join(parts) + "."

@@ -439,6 +439,7 @@ body{
 </div>
 
 <div id="lesson-thumbs-data" style="display:none;">{{ lesson_thumb_json }}</div>
+<div id="lessons-count" style="display:none;">{{ lessons|length }}</div>
 <div class="character-container">
   <button class="rafiq-close-btn" aria-label="إخفاء رفيق">×</button>
   <div class="rafiq-speech" role="status" aria-live="polite"></div>
@@ -452,10 +453,6 @@ body{
 </button>
 
 <script>
-/* بيانات من Django */
-const lessonsCount = {{ lessons|length }};
-const subjectName = "{{ subject.subjectname }}";
-
 /* صور الدروس من JSON */
 (function(){
   var thumbs = {};
@@ -596,7 +593,8 @@ async function startRafiqIntro(video) {
 
   try {
     // التحقق من وجود دروس
-    const hasLessons = {{ lessons|length }} > 0;
+    const lessonsCountEl = document.getElementById('lessons-count');
+    const hasLessons = lessonsCountEl ? parseInt(lessonsCountEl.textContent) > 0 : false;
     
     if (!hasLessons) {
       // لا توجد دروس - رسالة انتظار

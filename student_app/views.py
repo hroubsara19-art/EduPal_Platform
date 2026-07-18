@@ -14,6 +14,10 @@ student_app/views.py
     ✅ is_completed: جلسة صالحة + اختبار مكتمل (إن وُجد) → شارة "درس منجز".
     ✅ is_subject_completed: كل دروس المادة منجزة → شارة "مادة مكتملة".
     ✅ إصلاح student_profile: يحفظ address + bio + avatar بشكل صحيح.
+    ✅ [إصلاح جديد] unfinished_subjects: يرجّع الآن has_content لتمييز حالة
+       "لا توجد مواد مطلقاً" عن "توجد مواد لكن بلا دروس منشورة بعد" عن
+       "أنهى الطالب كل شيء" — لمنع رفيق من قول رسالة خاطئة عندما تكون
+       المواد فعلاً مضافة للطالب.
 """
 import logging
 import os
@@ -422,6 +426,7 @@ def student_home(request):
             {str(k): v for k, v in lesson_test_map.items()},
             ensure_ascii=False
         ),
+        'has_any_subjects':     len(subjects_map) > 0,
     })
 
 
@@ -1545,11 +1550,21 @@ def unfinished_lessons_in_subject(request, subject_id):
 
 @_student_required
 def unfinished_subjects(request):
-    """Returns subject names the student hasn't finished, for Rafiq to speak."""
+    """
+    Returns subject names the student hasn't finished, for Rafiq to speak.
+
+    ✅ [إصلاح] أصبحنا نرجّع أيضاً has_content لتمييز 3 حالات مختلفة على الواجهة:
+       1) لا توجد مواد مُسندة للطالب إطلاقاً (يُعالَج مسبقاً في الواجهة عبر has_any_subjects).
+       2) توجد مواد مُسندة، لكن لا يوجد فيها دروس/اختبارات منشورة بعد
+          → has_content = False (وليس رسالة "بانتظار أن يضيفك معلمك لمواده"،
+            لأن الطالب أصلاً مُضاف لمواده، فقط لا توجد دروس منشورة بعد).
+       3) توجد مواد وفيها محتوى، والطالب أنهى كل شيء
+          → has_content = True و unfinished_subjects = [] (رسالة تهنئة).
+    """
     student = request.student
     from learning.models import StudentTeacherAssignment
     if not student:
-        return JsonResponse({'unfinished_subjects': []})
+        return JsonResponse({'unfinished_subjects': [], 'has_content': False})
     assigned_classes = StudentTeacherAssignment.objects.filter(
         studentid=student,
         is_active=True
@@ -1583,11 +1598,13 @@ def unfinished_subjects(request):
     for t in Test.objects.filter(subjectid__in=subjects_map.keys(), lessonid__isnull=True):
         general_tests_by_subject.setdefault(t.subjectid_id, []).append(t)
     unfinished_names = []
+    has_content = False  # ✅ هل يوجد على الأقل مادة واحدة تحتوي دروساً/اختبارات فعلية؟
     for sid, item in subjects_map.items():
         lessons_in_subj = item['lessons']
         subject_general_tests = general_tests_by_subject.get(sid, [])
         if not lessons_in_subj and not subject_general_tests:
             continue  # empty subject, skip (matches your existing logic)
+        has_content = True
         all_done = True
         for lesson in lessons_in_subj:
             lt = tests_by_lesson.get(lesson.pk)
@@ -1602,4 +1619,7 @@ def unfinished_subjects(request):
                     break
         if not all_done:
             unfinished_names.append(item['subject'].subjectname)
-    return JsonResponse({'unfinished_subjects': unfinished_names})
+    return JsonResponse({
+        'unfinished_subjects': unfinished_names,
+        'has_content': has_content,
+    })

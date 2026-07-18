@@ -593,6 +593,7 @@ height: 100%;
 {% endblock %}
 
 {% block content %}
+<div id="has-any-subjects" style="display:none;">{{ has_any_subjects|lower }}</div>
 <div class="page-wrap" dir="rtl">
 
   <!-- بانر الترحيب -->
@@ -816,13 +817,36 @@ var LESSON_TEST_MAP = (function(){
     }
   });
 })();
+/* ✅ إزالة الإيموجي والرموز التصويرية من النص قبل إرساله لخدمة تحويل النص لصوت،
+   حتى لا يقرأ رفيق كلمات مثل "إيموجي وجه مبتسم" أو أسماء الرموز بصوت عالٍ.
+   لا تُستخدم هذه الدالة على نص فقاعة الكلام (تبقى الفقاعة تعرض الإيموجي كما هو). */
+function stripEmojisAndSymbols(text) {
+  if (!text) return text;
+  try {
+    return text
+      // الرموز التصويرية الموسّعة (تغطي أغلب الإيموجي: 😀 📚 🎉 ⚽ ... إلخ)
+      .replace(/[\p{Extended_Pictographic}\u200D\uFE0F\u20E3]/gu, '')
+      // رموز محارف متغيرة الشكل (Variation Selectors) المتبقية إن وُجدت
+      .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+      // تنظيف المسافات الزائدة الناتجة عن الحذف
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  } catch (e) {
+    // بعض المتصفحات القديمة جداً لا تدعم \p{Extended_Pictographic}؛
+    // في هذه الحالة نُعيد النص كما هو بدل كسر الصوت بالكامل.
+    console.warn('stripEmojisAndSymbols fallback:', e);
+    return text;
+  }
+}
+
 async function playRafiqVoice(text) {
   showRafiqSpeech(text);
+  const speechText = stripEmojisAndSymbols(text);
   try {
     const response = await fetch('/api/generate-voice/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify({ text: speechText })
     });
 
     if (!response.ok) throw new Error('Voice generation failed');
@@ -937,7 +961,7 @@ async function startRafiqIntro(video) {
     rafiqVoiceFinished = (async () => {
     try {
         await playRafiqVoice(
-       `أَهْلًا بِكَ يَا ${studentName}! أنا سَعِيدٌ جِدًّا بِرُؤْيَتِكَ .. هَلْ أَنْتَ مُسْتَعِدٌّ لِرِحْلَةٍ مُمْتِعَةٍ 
+       `أَهْلًا بِكَ يَا ${studentName}! أنا سَعِيدٌ جِدًّا بِرُؤْيَتِكَ .. هَلْ أَنْتَ مُسْتَعِدٌّ لِرِحْلَةٍ مُمْتِعَةٍ 
        `)
         ;
     } catch (err) {
@@ -948,9 +972,21 @@ async function startRafiqIntro(video) {
     }
 
     try {
+        // ✅ التحقق من وجود مواد مسندة للطالب فعلياً (مسجّل عند معلم/معلمين)
+        const hasAnySubjectsEl = document.getElementById('has-any-subjects');
+        const hasAnySubjects = hasAnySubjectsEl ? hasAnySubjectsEl.textContent === 'true' : false;
+        
+        if (!hasAnySubjects) {
+            // ✅ لا توجد أي مادة مسندة للطالب إطلاقاً بعد -> رسالة "بانتظار أن يضيفك المعلم"
+            await playRafiqVoice("انْتَظِرْ حَتَّى يُضِيفَكَ مُعَلِّمُكَ إِلَى مَوَادِّهِ.");
+            wait(1000).then(showRafiqToggle);
+            return;
+        }
+        
+       // ✅ الطالب لديه مواد مسندة فعلاً — نجلب حالة الإنجاز الحقيقية من الخادم
        const response = await fetch('/student/api/unfinished-subjects/');
        const data = await response.json();
-    const text = buildUnfinishedSubjectsText(data.unfinished_subjects);
+    const text = buildUnfinishedSubjectsText(data.unfinished_subjects, data.has_content);
     await playRafiqVoice(text);
     } catch (err) {
         console.error('Failed to fetch unfinished subjects:', err);
@@ -979,24 +1015,34 @@ async function startRafiqIntro(video) {
 // video.addEventListener("click", () => {
 //  startRafiqIntro(video);
 // })
-function buildUnfinishedSubjectsText(subjects) {
-  if (subjects.length === 0) {
-    return "انْتَظِرْ حَتَّى يُضِيفَكَ مُعَلِّمُكَ إِلَى مَوَادِّهِ.";
- 
+function buildUnfinishedSubjectsText(subjects, hasContent) {
+  // ✅ توجد دروس/اختبارات متبقية -> نذكرها كما كان سابقاً
+  if (subjects.length > 0) {
+    if (subjects.length === 1) {
+      return `مُتَبَقٍّ لَدَيْكَ مَادَّةُ ${subjects[0]}، فَلْنُكْمِلْهَا مَعًا!`;
+    }
+    const allButLast = subjects.slice(0, -1).join('، ');
+    const last = subjects[subjects.length - 1];
+    return `مُتَبَقٍّ لَدَيْكَ مَوَادُّ ${allButLast} و ${last}.`;
   }
-  if (subjects.length === 1) {
-    return `مُتَبَقٍّ لَدَيْكَ مَادَّةُ ${subjects[0]}، فَلْنُكْمِلْهَا مَعًا!`;
-  }
-  const allButLast = subjects.slice(0, -1).join('، ');
 
-  const last = subjects[subjects.length - 1];
-  return `مُتَبَقٍّ لَدَيْكَ مَوَادُّ ${allButLast} و ${last}.`;
+  // ✅ [إصلاح] subjects.length === 0 لا يعني بالضرورة "لا توجد مواد أصلاً"،
+  // بل قد يعني أن مواد الطالب لا تحتوي دروساً منشورة بعد، أو أنه أنهى
+  // كل شيء بنجاح. نفرّق بين الحالتين باستخدام hasContent القادمة من الخادم
+  // بدل تكرار رسالة "بانتظار أن يضيفك معلمك" الخاطئة في هذه الحالة.
+  if (hasContent === false) {
+    // الطالب مسجّل في مواد بالفعل، لكن لا يوجد فيها دروس منشورة بعد
+    return "مُعَلِّمُكَ سَيُضِيفُ دُرُوسًا قَرِيبًا لِمَوَادِّكَ، تَابِعْ لَاحِقًا!";
+  }
+
+  // الطالب أنهى كل الدروس والاختبارات المتاحة في مواده
+  return "أَحْسَنْتَ! لَقَدْ أَنْهَيْتَ جَمِيعَ دُرُوسِكَ الْمُتَاحَةِ حَالِيًّا 🎉";
 }
 
 
 // مثال استخدام: لما رفيق يرحب بالطالب
 // document.getElementById('intro-video').addEventListener('loadstart', () => {
-//   playRafiqVoice(`أَهْلًا بِكَ يَا ${studentName}! أنا سَعِيدٌ جِدًّا بِرُؤْيَتِكَ الْيَوْمْ.. هَلْ أَنْتَ مُسْتَعِدٌّ لِرِحْلَةٍ مُمْتِعَةٍ جَدِيدَةٍ؟`)});
+//   playRafiqVoice(`أَهْلًا بِكَ يَا ${studentName}! أنا سَعِيدٌ جِدًّا بِرُؤْيَتِكَ الْيَوْمْ.. هَلْ أَنْتَ مُسْتَعِدٌّ لِرِحْلَةٍ مُمْتِعَةٍ جَدِيدَةٍ؟`)});
 
 
 // });
