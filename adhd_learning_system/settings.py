@@ -30,8 +30,12 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 # استقبال الهوستس ديناميكياً لتشمل سيرفرات Render والمحلي و ngrok
 ALLOWED_HOSTS = os.environ.get(
     'ALLOWED_HOSTS', 
-    'localhost,127.0.0.1,gigantic-dice-unheated.ngrok-free.dev,.onrender.com'
+    'localhost,127.0.0.1,gigantic-dice-unheated.ngrok-free.dev,rafeeq-platform-tpne.onrender.com'
 ).split(',')
+
+# إضافة دعم النطاقات الفرعية لـ Render لضمان القبول التلقائي
+if '.onrender.com' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.onrender.com')
 
 # ── التطبيقات ────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -140,6 +144,7 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
     'https://gigantic-dice-unheated.ngrok-free.dev',
+    'https://rafeeq-platform-tpne.onrender.com',
     'https://*.onrender.com'  # قبول أي رابط فرعي تولده منصة Render تلقائياً
 ]
 
@@ -180,7 +185,7 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD            = True
     SECURE_CONTENT_TYPE_NOSNIFF    = True
     X_FRAME_OPTIONS                = 'SAMEORIGIN'
-    SECURE_BROWSER_XSS_FILTER      = True
+    SECURE_BROWSER_XSS_FILTER       = True
     SECURE_REFERRER_POLICY         = "no-referrer-when-downgrade"
 
 # ── إخفاء SessionInterrupted من الـ logs ─────────────────────
