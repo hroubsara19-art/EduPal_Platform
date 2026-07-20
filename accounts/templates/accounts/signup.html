@@ -1139,12 +1139,41 @@
                 <h1 class="hero-title" id="hero-title">
                     منصة <span class="brand-word">رفيق</span> التعليمية
                 </h1>
-                <p class="hero-description" style="color: #4F8583; font-weight: 500;">
-                    <span style="color: #3f706d; font-weight: 700;">منصة تعليمية ذكية وتكيفية</span> تدعم <span style="color: #F59E0B; font-weight: 700;">انتباه الطالب</span> وتقلل <span style="color: #F59E0B; font-weight: 700;">التشتت</span>، عبر محتوى متدرج يبدأ بـ <span style="color: #3f706d; font-weight: 700;">النص والصوت والصور</span>، مروراً بـ <span style="color: #3f706d; font-weight: 700;">الفيديو التفاعلي</span>، وصولاً إلى <span style="color: #3f706d; font-weight: 700;">تجربة الواقع الافتراضي (VR)</span> لتعزيز <span style="color: #3f706d; font-weight: 700;">الفهم والتركيز</span>.
-                </p>
-                <p class="hero-description" style="color: #4F8583; font-weight: 500;">
-                    تجمع الجميع في <span style="color: #F59E0B; font-weight: 700;">بيئة واحدة</span>، تمنح الطالب <span style="color: #3f706d; font-weight: 700;">مساراً واضحاً</span>، والمعلم <span style="color: #3f706d; font-weight: 700;">أدوات ذكية مساندة</span>، والأهل <span style="color: #3f706d; font-weight: 700;">متابعة مستمرة للتقدم</span>، ليكون التعلم أكثر <span style="color: #F59E0B; font-weight: 700;">تنظيماً وتفاعلاً ودعماً</span>.
-                </p>
+                <div class="hero-description" style="color: #4F8583; font-weight: 500; position: relative; margin-top: 40px;">
+                    <button onclick="playFullDescription()" style="position: absolute; top: -40px; right: 0; background: #3f706d; color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 1rem; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(63, 112, 109, 0.3);">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <ul style="list-style: none; padding: 0; margin: 0; line-height: 2;">
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-graduation-cap" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span><b>منصة تعليمية ذكية وتكيفية</b> تدعم <b>انتباه الطالب</b> وتقلل <b>التشتت</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-layer-group" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span>محتوى متدرج يبدأ بـ <b>النص والصوت والصور</b>، مروراً بـ <b>الفيديو التفاعلي</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-vr-cardboard" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span>يقدم <b>تجربة واقع افتراضي (VR)</b> لتعزيز <b>الفهم والتركيز</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-users" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span>تجمع <b>الطالب والمعلم والأهل</b> في <b>بيئة واحدة</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-road" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span>تمنح الطالب <b>مساراً تعليمياً واضحاً</b>، وللمعلم <b>أدوات ذكية مساندة</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-chart-line" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span>توفر للأهل <b>متابعة مستمرة للتقدم</b>.</span>
+                        </li>
+                        <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-star" style="color: #3f706d; font-size: 1.1rem; margin-top: 4px;"></i>
+                            <span> توفر تجربة تعليمية أكثر <b>تنظيماً وتفاعلاً ودعماً</b>.</span>
+                        </li>
+                    </ul>
+                </div>
                 <div class="hero-actions">
                     <a class="hero-primary" href="#signup-section" style="padding: 15px 30px;">
                         ابدأ رحلتك الان
@@ -1400,6 +1429,121 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري المعالجة...';
         };
+
+        // إزالة الإيموجي والرموز التصويرية من النص قبل إرساله لخدمة تحويل النص لصوت
+        function stripEmojisAndSymbols(text) {
+            if (!text) return text;
+            try {
+                return text
+                    // الرموز التصويرية الموسّعة (تغطي أغلب الإيموجي: 😀 📚 🎉 ⚽ ... إلخ)
+                    .replace(/[\p{Extended_Pictographic}\u200D\uFE0F\u20E3]/gu, '')
+                    // رموز محارف متغيرة الشكل (Variation Selectors) المتبقية إن وُجدت
+                    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+                    // تنظيف المسافات الزائدة الناتجة عن الحذف
+                    .replace(/[ \t]{2,}/g, ' ')
+                    .trim();
+            } catch (e) {
+                // بعض المتصفحات القديمة جداً لا تدعم \p{Extended_Pictographic}؛
+                // في هذه الحالة نُعيد النص كما هو بدل كسر الصوت بالكامل.
+                console.warn('stripEmojisAndSymbols fallback:', e);
+                return text;
+            }
+        }
+
+        let currentAudio = null; // لتخزين كائن الصوت النشط
+        let isPlaying = false; // لتتبع حالة الصوت (يعمل/متوقف)
+
+        // دالة قراءة النص بصوت رفيق (نفس نظام صفحة الطالب)
+        async function speakText(text) {
+            const speechText = stripEmojisAndSymbols(text);
+            try {
+                const response = await fetch('/api/generate-voice/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: speechText })
+                });
+
+                if (!response.ok) throw new Error('Voice generation failed');
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                // تخزين كائن الصوت النشط لإمكانية إيقافه
+                currentAudio = audio;
+
+                console.log("Trying to play voice:", text);
+
+                return new Promise((resolve, reject) => {
+                    audio.addEventListener('ended', () => {
+                        URL.revokeObjectURL(audioUrl);
+                        currentAudio = null;
+                        resolve();
+                    });
+                    audio.addEventListener('error', (e) => {
+                        URL.revokeObjectURL(audioUrl);
+                        currentAudio = null;
+                        reject(e);
+                    });
+                    audio.play().catch(err => {
+                        console.log(err);
+                        currentAudio = null;
+                        reject(err);
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error playing voice:', error);
+                currentAudio = null;
+            }
+        }
+
+        // دالة لقراءة الوصف الكامل مع التبديل بين التشغيل والإيقاف
+        function playFullDescription() {
+            const button = document.querySelector('button[onclick="playFullDescription()"]');
+            const icon = button.querySelector('i');
+
+            if (isPlaying && currentAudio) {
+                // إيقاف الصوت
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+                isPlaying = false;
+
+                // تأثير بصري: إرجاع الزر لحالته الأصلية
+                button.style.background = '#3f706d';
+                icon.className = 'fas fa-volume-up';
+            } else {
+                // تشغيل الصوت
+                isPlaying = true;
+
+                // تأثير بصري: تغيير لون الزر والأيقونة
+                button.style.background = '#df815a';
+                icon.className = 'fas fa-volume-mute';
+
+                const fullText = `
+                    منصة تعليمية ذكية وتكيفية تدعم انتباه الطالب وتقلل التشتت.
+                    محتوى متدرج يبدأ بالنص والصوت والصور، مروراً بالفيديو التفاعلي.
+                    ويقدم تجربة واقع افتراضي VR لتعزيز الفهم والتركيز.
+                    تجمع الطالب والمعلم والأهل في بيئة واحدة.
+                    تمنح الطالب مساراً تعليمياً واضحاً، وللمعلم أدوات ذكية مساندة.
+                    وتوفر للأهل متابعة مستمرة للتقدم.
+                    بالنتيجة توفر تجربة تعليمية أكثر تنظيماً وتفاعلاً ودعماً.
+                `;
+
+                speakText(fullText).then(() => {
+                    // عند انتهاء الصوت، إرجاع الزر لحالته الأصلية
+                    isPlaying = false;
+                    button.style.background = '#3f706d';
+                    icon.className = 'fas fa-volume-up';
+                }).catch(() => {
+                    // في حالة الخطأ، إرجاع الزر لحالته الأصلية
+                    isPlaying = false;
+                    button.style.background = '#3f706d';
+                    icon.className = 'fas fa-volume-up';
+                });
+            }
+        }
     </script>
 </body>
 </html>
