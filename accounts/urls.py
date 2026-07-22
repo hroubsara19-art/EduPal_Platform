@@ -42,13 +42,27 @@ class RateLimitedPasswordResetView(auth_views.PasswordResetView):
                 # تم الإرسال مؤخراً — اذهب مباشرة لصفحة Done بدون إرسال
                 return redirect(self.success_url)
 
-        response = super().post(request, *args, **kwargs)
+        try:
+            response = super().post(request, *args, **kwargs)
 
-        # بعد الإرسال الناجح سجّل في cache لمنع التكرار
-        if email and response.status_code == 302:
-            cache.set(self._cache_key(email), True, timeout=self.COOLDOWN_SECONDS)
+            # بعد الإرسال الناجح سجّل في cache لمنع التكرار
+            if email and response.status_code == 302:
+                cache.set(self._cache_key(email), True, timeout=self.COOLDOWN_SECONDS)
 
-        return response
+            return response
+        except Exception as e:
+            # معالجة أخطاء إرسال البريد
+            messages.error(
+                request,
+                'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى التأكد من إعدادات البريد أو المحاولة لاحقاً.'
+            )
+            # تسجيل الخطأ للمراجعة
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Password reset error for {email}: {str(e)}')
+            
+            # العودة للصفحة مع رسالة الخطأ
+            return self.form_invalid(self.get_form())
 
 
 urlpatterns = [
