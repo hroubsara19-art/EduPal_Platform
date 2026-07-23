@@ -1,6 +1,3 @@
-"""
-student_app/chat_views.py
-"""
 from __future__ import annotations
 
 import json
@@ -10,9 +7,9 @@ import random
 import re
 
 from django.contrib.auth.decorators import login_required
-from django.http                    import JsonResponse
-from django.shortcuts               import get_object_or_404
-from django.views.decorators.http   import require_POST
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST
 
 from learning.models import (
     AiAgent, AiInteraction, Learningsession,
@@ -22,10 +19,10 @@ from learning.models import (
 logger = logging.getLogger(__name__)
 
 # ══════════════════════════════════════════════════════════════
-# ثوابت
+# الثوابت
 # ══════════════════════════════════════════════════════════════
 CONTEXT_LIMIT  = 4000
-RESPONSE_LIMIT = 2000  # ✅ زيادة الحد من 700 إلى 2000 حرف لتجنب قطع الردود
+RESPONSE_LIMIT = 2000  # ✅ حد أحرف الرد لتجنب اقتطاع النصوص
 MAX_HISTORY    = 6
 
 _GEMINI_REST = (
@@ -33,7 +30,7 @@ _GEMINI_REST = (
     "/v1beta/models/{model}:generateContent?key={key}"
 )
 
-# ✅ موديلات مدعومة فعلياً — حُذف gemini-1.5-* من القائمة
+# ✅ موديلات مدعومة فعلياً
 _VALID_MODELS = {
     'gemini-2.5-flash',
     'gemini-2.5-flash-preview-05-20',
@@ -41,7 +38,7 @@ _VALID_MODELS = {
     'gemini-2.0-flash-001',
     'gemini-2.0-flash-lite',
 }
-_DEFAULT_MODEL = 'gemini-2.5-flash'  # ✅ الأحدث والمجاني
+_DEFAULT_MODEL = 'gemini-2.5-flash'  # ✅ النموذج الافتراضي الموصى به
 
 _OFF_TOPIC_REPLIES = [
     "أهلاً بك 😊 سؤالك جميل! لكنه خارج موضوع درس **{title}**. "
@@ -59,7 +56,7 @@ def _off_topic_reply(title: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════
-# تنظيف اسم الموديل
+# تنظيف وتوحيد اسم الموديل
 # ══════════════════════════════════════════════════════════════
 def _normalize_model(version: str) -> str:
     if not version:
@@ -79,18 +76,18 @@ def _normalize_model(version: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════
-# ✅ جلب مفتاح API — الأولوية: env/settings أولاً
+# ✅ جلب مفتاح API حسب ترتيب الأولوية
 # ══════════════════════════════════════════════════════════════
 def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | None, str]:
     """
     ترتيب الأولوية:
-      1. مفتاح جيميني الخاص بالطالب ← أولاً للشات بوت
+      1. مفتاح جيميني الخاص بالطالب
       2. GEMINI_API_KEY من settings.py / .env
-      3. AiAgent في DB (المفتاح الخام فقط، نتجنب decrypt المعطوب)
+      3. AiAgent في DB (المفتاح الخام)
       4. مفتاح المعلم الشخصي
     """
 
-    # ── الأولوية 1: مفتاح جيميني الخاص بالطالب ✅ ─────────────
+    # ── الأولوية 1: مفتاح جيميني الخاص بالطالب ─────────────────────
     if student:
         try:
             fn = getattr(student, 'get_gemini_key', None)
@@ -107,7 +104,7 @@ def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | 
         except Exception:
             pass
 
-    # ── الأولوية 1: settings / .env ✅ ─────────────────────────
+    # ── الأولوية 2: settings / .env ────────────────────────────
     env_key = None
     try:
         from django.conf import settings as _s
@@ -119,9 +116,7 @@ def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | 
 
     if env_key and str(env_key).strip():
         key = str(env_key).strip()
-        # ✅ التحقق من صحة المفتاح - يدعم المفاتيح القديمة (AIza) والجديدة (AQ.Ab8RN6)
         if key.startswith('AIza') or key.startswith('AQ.') or len(key) >= 20:
-            # نحاول قراءة الموديل من AiAgent إن وُجد
             model = _DEFAULT_MODEL
             try:
                 agent = AiAgent.objects.filter(isactive=True).first()
@@ -132,11 +127,10 @@ def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | 
             logger.info(f'[chat] ✓ Using GEMINI_API_KEY from env, model={model!r}')
             return key, model
 
-    # ── الأولوية 2: AiAgent — المفتاح الخام فقط ───────────────
+    # ── الأولوية 3: AiAgent — المفتاح الخام ───────────────────────
     try:
         agent = AiAgent.objects.filter(isactive=True).first()
         if agent:
-            # محاولة get_api_key() أولاً
             raw_key = None
             fn = getattr(agent, 'get_api_key', None)
             if fn and callable(fn):
@@ -145,7 +139,6 @@ def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | 
                 except Exception as e:
                     logger.debug(f'[chat] AiAgent.get_api_key() failed: {e}')
 
-            # fallback: قراءة api_key الخام
             if not raw_key:
                 raw = str(getattr(agent, 'api_key', '') or '').strip()
                 if raw.startswith('AIza') or raw.startswith('AQ.') or len(raw) >= 20:
@@ -160,7 +153,7 @@ def _get_api_key(lesson: Lessoncontent, student: Student = None) -> tuple[str | 
     except Exception as e:
         logger.warning(f'[chat] AiAgent lookup error: {e}')
 
-    # ── الأولوية 3: مفتاح المعلم الشخصي ───────────────────────
+    # ── الأولوية 4: مفتاح المعلم الشخصي ───────────────────────
     try:
         teacher = getattr(lesson, 'teacherid', None)
         if teacher:
@@ -236,7 +229,7 @@ def _call_gemini_sdk(api_key: str, model: str, system: str,
 
         config = types.GenerateContentConfig(
             system_instruction=system,
-            max_output_tokens=1000,  # ✅ زيادة من 450 إلى 1000 لتجنب قطع الردود
+            max_output_tokens=1000,  # ✅ تم زيادة التوكنز لتفادي اقتطاع الجمل
             temperature=0.4,
             top_p=0.85,
         )
@@ -283,7 +276,7 @@ def _call_gemini_rest(api_key: str, model: str, system: str,
         'system_instruction': {'parts': [{'text': system}]},
         'contents':           contents,
         'generationConfig':   {
-            'maxOutputTokens': 1000,  # ✅ زيادة من 450 إلى 1000 لتجنب قطع الردود
+            'maxOutputTokens': 1000,  # ✅ تم زيادة التوكنز هنا أيضاً
             'temperature':     0.4,
             'topP':            0.85,
         },
@@ -314,7 +307,7 @@ def _call_gemini_rest(api_key: str, model: str, system: str,
     except urllib.error.HTTPError as exc:
         body = exc.read().decode('utf-8', errors='ignore')[:300]
         logger.error(f'[chat] REST HTTP {exc.code} model={model}: {body}')
-        # 404/400 → جرّب DEFAULT مرة واحدة
+        # 404/400 → إعادة المحاولة مع النماذج الافتراضية
         if exc.code in (400, 404) and not _retried and model != _DEFAULT_MODEL:
             logger.info(f'[chat] Retry with {_DEFAULT_MODEL}')
             return _call_gemini_rest(
@@ -356,7 +349,7 @@ def _call_gemini(api_key: str, model: str, system: str,
 
 
 # ══════════════════════════════════════════════════════════════
-# View رئيسي
+# View الرئيسي المحمي
 # ══════════════════════════════════════════════════════════════
 @login_required
 @require_POST

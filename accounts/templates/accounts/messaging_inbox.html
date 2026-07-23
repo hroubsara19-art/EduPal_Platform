@@ -464,6 +464,37 @@ body{
   border-radius:13px;
 }
 
+.voice-record-btn{
+  width:44px;
+  height:42px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:var(--blue-md);
+  color:#fff;
+  border:none;
+  cursor:pointer;
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+  margin-left:.45rem;
+}
+
+.voice-record-btn:hover{
+  filter:brightness(1.05);
+  transform:translateY(-2px);
+  box-shadow:0 10px 20px rgba(49,91,89,.23);
+}
+
+.voice-record-btn.recording{
+  background:#ef4444;
+  animation:pulse-record 1.5s infinite;
+}
+
+@keyframes pulse-record{
+  0%,100%{transform:scale(1);box-shadow:0 7px 15px rgba(239,68,68,.18);}
+  50%{transform:scale(1.1);box-shadow:0 10px 25px rgba(239,68,68,.35);}
+}
+
 .send-btn{
   width:44px;
   height:42px;
@@ -726,6 +757,9 @@ body{
                   maxlength="2000"
                   oninput="autoResize(this)"
                   onkeydown="handleKey(event)"></textarea>
+        <button class="voice-record-btn" id="voiceRecordBtn" onclick="toggleVoiceRecord()" title="تسجيل صوتي">
+          <i class="fas fa-microphone"></i>
+        </button>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="إرسال">
           <i class="fas fa-paper-plane"></i>
         </button>
@@ -817,6 +851,85 @@ var MY_ID      = parseInt(_d.myId, 10);
 var MY_NAME    = _d.myName;
 var CONV_ID    = _d.convId ? parseInt(_d.convId, 10) : null;
 
+// ── Speech Recognition ──
+var recognition = null;
+var isRecording = false;
+var voiceTranscript = '';
+
+function initSpeechRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    console.log('Speech Recognition not supported');
+    return false;
+  }
+  
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.lang = 'ar-SA';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  
+  recognition.onstart = function() {
+    isRecording = true;
+    document.getElementById('voiceRecordBtn').classList.add('recording');
+    document.getElementById('voiceRecordBtn').innerHTML = '<i class="fas fa-stop"></i>';
+  };
+  
+  recognition.onresult = function(event) {
+    var transcript = '';
+    for (var i = event.resultIndex; i < event.results.length; ++i) {
+      transcript += event.results[i][0].transcript;
+    }
+    voiceTranscript = transcript;
+    document.getElementById('msgInput').value = transcript;
+    autoResize(document.getElementById('msgInput'));
+  };
+  
+  recognition.onerror = function(event) {
+    console.log('Speech recognition error:', event.error);
+    stopRecording();
+    showToast('حدث خطأ في التعرف على الصوت', 'danger');
+  };
+  
+  recognition.onend = function() {
+    if (isRecording) {
+      stopRecording();
+    }
+  };
+  
+  return true;
+}
+
+function toggleVoiceRecord() {
+  if (!recognition && !initSpeechRecognition()) {
+    showToast('متصفحك لا يدعم التعرف على الصوت', 'danger');
+    return;
+  }
+  
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording() {
+  if (!recognition) return;
+  try {
+    recognition.start();
+  } catch(e) {
+    console.log('Speech already started');
+  }
+}
+
+function stopRecording() {
+  if (!recognition) return;
+  isRecording = false;
+  recognition.stop();
+  document.getElementById('voiceRecordBtn').classList.remove('recording');
+  document.getElementById('voiceRecordBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+  voiceTranscript = '';
+}
+
 // lastMsgId — آخر id في الصفحة
 var lastMsgId = 0;
 document.querySelectorAll('#chatMessages [id^="msg-"]').forEach(function(el) {
@@ -867,6 +980,7 @@ function sendMessage() {
     if (!d.ok) { showToast(d.error || 'حدث خطأ', 'danger'); return; }
     input.value = '';
     input.style.height = 'auto';
+    voiceTranscript = '';
     appendBubble(d.msg, true);
     lastMsgId = d.msg.id;
     updateConvPreview(CONV_ID, d.msg.body, d.msg.sent_at);
